@@ -192,6 +192,12 @@
   #pageInput { width:58px; text-align:center; font-family:var(--mono); font-size:12.5px; padding:4px 6px;
                background:var(--panel-raised); color:var(--ink); border:1px solid var(--line); border-radius:3px; }
   #pageInput:focus { border-color:var(--teal); outline:none; }
+  /* Strip the native number spinners — Prev/Next already do that job, and a
+     second pair of tiny arrows right next to them just reads as clutter.
+     type="number" stays so phones still bring up the numeric keypad. */
+  #pageInput::-webkit-outer-spin-button,
+  #pageInput::-webkit-inner-spin-button { -webkit-appearance:none; appearance:none; margin:0; }
+  #pageInput { -moz-appearance:textfield; appearance:textfield; }
   .searchWrap { display:flex; gap:0; }
   .searchWrap input { border-radius:3px 0 0 3px; border-right:none; }
   .searchWrap button { border-radius:0 3px 3px 0; }

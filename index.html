@@ -316,7 +316,7 @@
       <option value="15-30">Depth: 15&ndash;30%</option>
       <option value="30plus">Depth: 30%+</option>
     </select>
-    <select id="liquidityMode" onchange="render()" title="Filters on 20-day average dollar volume — excludes names too thin to trade comfortably at size">
+    <select id="liquidityMode" onchange="render()" title="Filters on 20-day average dollar volume — excludes names too thin to trade comfortably at size. Rows with no volume data at all are never excluded, since there is nothing to check them against">
       <option value="0">Liquidity: any</option>
       <option value="5000000">Liquidity: $5M+/day</option>
       <option value="20000000">Liquidity: $20M+/day</option>
@@ -374,7 +374,7 @@
           <th data-key="relStrengthPct" title="This stock's 6-month % move minus the S&P 500's (SPY) over the same window — positive means it's outperforming the market, not just following it">vs S&amp;P%</th>
           <th data-key="rr" title="Reward:Risk using (Target − top of Buy Zone) / (top of Buy Zone − Stop)">R:R</th>
           <th data-key="chasingRisk" title="Chasing Risk: how far price sits above the top of the Buy Zone, in ATR units. Deep-Pullback flag: for 30%+ pullbacks, how many of 4 reversal-confirmation signals are present (price vs 50DMA, weekly trend, RS vs SPY, volume) — few/none confirmed is a falling-knife warning, not a buy signal">Risk</th>
-          <th data-key="avgDollarVol20D" title="20-day average dollar volume (price × share volume) — a liquidity read; use the Liquidity filter above to exclude thin names">$Vol(20D)</th>
+          <th data-key="avgDollarVol20D" title="20-day average dollar volume — each day&#39;s own closing price × that same day&#39;s share volume, averaged over the last 20 trading days (so a big recent move doesn&#39;t re-price older volume). A liquidity read; use the Liquidity filter above to exclude thin names">$Vol(20D)</th>
           <th data-key="marketCap" title="Live market cap via GOOGLEFINANCE — use the Cap filter above to restrict to medium/large-cap names">Mkt Cap</th>
           <th data-key="high" title="Highest close in the last 6 months">6M High</th>
           <th data-key="low" title="Lowest close in the last 6 months">6M Low</th>

@@ -63,13 +63,35 @@
   ::-webkit-scrollbar-thumb { background: var(--steel-dim); border-radius:5px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--cobalt); }
 
-  header { border-bottom: 2px solid transparent; border-image: linear-gradient(90deg, var(--midnightblue), var(--steel), var(--cobalt), var(--skyblue)) 1; padding-bottom: 18px; margin-bottom: 22px; display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:14px;}
-  h1 { font-size: 26px; margin:0 0 4px; font-weight:600; letter-spacing:0.2px;}
+  header { border-bottom: 2px solid transparent; border-image: linear-gradient(90deg, var(--midnightblue), var(--steel), var(--cobalt), var(--skyblue)) 1; padding-bottom: 12px; margin-bottom: 16px; display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:10px;}
+  h1 { font-size: 26px; margin:0; font-weight:600; letter-spacing:0.2px;}
   .sub { color: var(--ink-dim); font-size: 13.5px; max-width:560px; }
   .stamp { font-family: var(--mono); font-size:12px; color: var(--brass); text-align:right; }
   .title-row { display:flex; align-items:center; gap:12px; }
   .title-row img { width:40px; height:40px; border-radius:9px; flex:0 0 auto; }
   .byline { color: var(--ink-dim); font-size: 9px; margin-top:3px; margin-bottom:8px; opacity:0.85; }
+
+  /* The standing description is read once and then it's just a paragraph
+     between you and the data, so it folds away behind the title. */
+  .header-blurb { display:none; margin-top:8px; }
+  .header-blurb.open { display:block; }
+  .blurb-toggle { flex:0 0 auto; padding:2px 8px; font-size:11px; font-family:var(--mono);
+                  letter-spacing:0.4px; color:var(--steel); border-color:var(--steel-dim);
+                  background:transparent; align-self:center; }
+  .blurb-toggle::after { content:' \25BE'; }
+  .blurb-toggle[aria-expanded="true"]::after { content:' \25B4'; }
+  .blurb-toggle:hover { color:var(--teal); border-color:var(--teal); background:transparent; }
+
+  /* Phone: claw back the rest of the space above the fold. */
+  @media (max-width: 700px){
+    body { padding: 14px 12px 40px; }
+    header { padding-bottom:9px; margin-bottom:12px; gap:6px; }
+    h1 { font-size: 18px; line-height:1.25; }
+    .title-row { gap:9px; }
+    .title-row img { width:30px; height:30px; border-radius:7px; }
+    .stamp { text-align:left; font-size:11px; }
+    .panel { padding:12px 14px; margin-bottom:14px; }
+  }
 
   .panel { background: var(--panel); border:1px solid var(--line); border-radius:3px; padding:18px 20px; margin-bottom:20px; }
   .panel h2 { font-size:15px; margin:0 0 12px; font-weight:600; color: var(--brass); }
@@ -89,25 +111,58 @@
   button.primary:hover { background: var(--skyblue); }
   .hint { color: var(--ink-dim); font-size:12.5px; }
 
-  table { width:100%; border-collapse: collapse; font-size: 13px; }
+  table { width:100%; border-collapse: collapse; font-size: 11.5px; }
   thead th {
-    text-align:left; font-family: var(--mono); font-weight:500; font-size:11px;
-    color: var(--ink-dim); border-bottom:1px solid var(--line); padding:6px 8px; white-space:nowrap;
-    cursor:pointer; user-select:none;
+    text-align:left; font-family: var(--mono); font-weight:500; font-size:10px;
+    color: var(--ink-dim); border-bottom:1px solid var(--line); padding:4px 6px; white-space:nowrap;
+    cursor:pointer; user-select:none; background: var(--panel);
   }
   thead th:hover { color: var(--brass); }
-  tbody td { padding:5px 8px; border-bottom:1px solid #2C313B; font-family: var(--mono); white-space:nowrap; }
+  tbody td { padding:3px 6px; border-bottom:1px solid #2C313B; font-family: var(--mono); white-space:nowrap; }
   tbody tr:hover { background: var(--panel-raised); }
   td.sym { font-family: var(--serif); font-weight:600; }
-  td.sector { font-family: var(--serif); color: var(--ink-dim); font-size:12px; }
+  td.sector { font-family: var(--serif); color: var(--ink-dim); font-size:11px; }
+  /* Roomy restores the old spacing for anyone reading on a big screen. */
+  #tbl.roomy { font-size:13px; }
+  #tbl.roomy thead th { font-size:11px; padding:6px 8px; }
+  #tbl.roomy tbody td { padding:5px 8px; }
+
+  /* The ticker stays put while the rest of the row scrolls sideways —
+     otherwise you lose track of which name you're reading halfway across. */
+  #tbl thead th:first-child, #tbl tbody td:first-child {
+    position: sticky; left: 0; z-index: 2;
+    box-shadow: 1px 0 0 var(--line);
+  }
+  #tbl thead th:first-child { z-index: 3; }
+  #tbl tbody td:first-child { background: var(--panel); }
+  #tbl tbody tr:hover td:first-child { background: var(--panel-raised); }
+  #tbl tbody td.sym.mom-rising  { background: #1C3B2E; }
+  #tbl tbody td.sym.mom-neutral { background: #222C3D; }
+  #tbl tbody td.sym.mom-falling { background: #40231F; }
+
+  /* "Key only" drops the secondary columns so the table fits a phone without
+     a sideways expedition. Indices track the header order below. */
+  #tbl.cols-key th:nth-child(2),  #tbl.cols-key td:nth-child(2),
+  #tbl.cols-key th:nth-child(6),  #tbl.cols-key td:nth-child(6),
+  #tbl.cols-key th:nth-child(7),  #tbl.cols-key td:nth-child(7),
+  #tbl.cols-key th:nth-child(11), #tbl.cols-key td:nth-child(11),
+  #tbl.cols-key th:nth-child(12), #tbl.cols-key td:nth-child(12),
+  #tbl.cols-key th:nth-child(13), #tbl.cols-key td:nth-child(13),
+  #tbl.cols-key th:nth-child(14), #tbl.cols-key td:nth-child(14),
+  #tbl.cols-key th:nth-child(17), #tbl.cols-key td:nth-child(17),
+  #tbl.cols-key th:nth-child(18), #tbl.cols-key td:nth-child(18),
+  #tbl.cols-key th:nth-child(19), #tbl.cols-key td:nth-child(19),
+  #tbl.cols-key th:nth-child(20), #tbl.cols-key td:nth-child(20),
+  #tbl.cols-key th:nth-child(21), #tbl.cols-key td:nth-child(21) { display:none; }
+
   input.cell {
-    width: 64px; background:transparent; border:1px solid transparent; color: var(--ink);
-    font-family: var(--mono); font-size:13px; padding:3px 4px; border-radius:2px;
+    width: 56px; background:transparent; border:1px solid transparent; color: var(--ink);
+    font-family: var(--mono); font-size:11.5px; padding:2px 3px; border-radius:2px;
   }
   input.cell:focus { border-color: var(--teal); outline:none; background: var(--panel-raised); }
-  select.cell { background:transparent; border:1px solid transparent; color: var(--ink); font-family:var(--mono); font-size:12px; }
+  select.cell { background:transparent; border:1px solid transparent; color: var(--ink); font-family:var(--mono); font-size:11px; padding:1px 2px; }
 
-  .badge { display:inline-block; padding:2px 7px; border-radius:2px; font-size:11px; font-family:var(--mono); }
+  .badge { display:inline-block; padding:1px 5px; border-radius:2px; font-size:10px; font-family:var(--mono); }
   .badge.pull { background: rgba(74,143,232,0.18); color: var(--brass); border:1px solid var(--brass-dim); }
   .badge.mom-up { background: rgba(94,158,140,0.18); color: var(--up); border:1px solid var(--up); }
   .badge.mom-flat { color: var(--ink-dim); }
@@ -131,6 +186,12 @@
   thead th.sortable::after { content:''; }
   thead th.sort-asc::after { content:' \25B2'; color: var(--brass); }
   thead th.sort-desc::after { content:' \25BC'; color: var(--brass); }
+  #pager { flex-wrap:wrap; gap:8px 12px !important; }
+  #pager button { white-space:nowrap; }
+  .pagerJump { font-family:var(--mono); font-size:12.5px; color:var(--ink-dim); display:inline-flex; align-items:center; gap:5px; }
+  #pageInput { width:58px; text-align:center; font-family:var(--mono); font-size:12.5px; padding:4px 6px;
+               background:var(--panel-raised); color:var(--ink); border:1px solid var(--line); border-radius:3px; }
+  #pageInput:focus { border-color:var(--teal); outline:none; }
   .searchWrap { display:flex; gap:0; }
   .searchWrap input { border-radius:3px 0 0 3px; border-right:none; }
   .searchWrap button { border-radius:0 3px 3px 0; }
@@ -146,28 +207,26 @@
   /* Buy-zone alerts as a single ticker-tape row rather than a stacked panel.
      It only scrolls when the content is actually wider than the strip, and it
      pauses on hover/tap so a name can be read and clicked while it moves. */
-  #alertPanel.tape-panel { display:flex; align-items:center; gap:9px; padding:7px 10px; margin-bottom:14px; }
+  #alertPanel.tape-panel { display:flex; align-items:center; gap:6px; padding:7px 8px; margin-bottom:14px; }
   .tape-label { flex:0 0 auto; font-family:var(--mono); font-size:10px; letter-spacing:0.6px;
                 text-transform:uppercase; color:var(--teal); white-space:nowrap; }
-  .tape-window { flex:1 1 auto; min-width:0; overflow:hidden;
+  /* Scrolls by hand (swipe, drag, shift+wheel, or the arrows) and also drifts
+     on its own; the drift yields to you the moment you touch it. */
+  .tape-window { flex:1 1 auto; min-width:0; overflow-x:auto; overflow-y:hidden;
+    scrollbar-width:none; -ms-overflow-style:none; overscroll-behavior-x:contain;
     -webkit-mask-image:linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
             mask-image:linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent); }
+  .tape-window::-webkit-scrollbar { display:none; }
   .tape-track { display:inline-flex; }
-  .tape-track.rolling { animation: tapeRoll var(--tape-dur, 36s) linear infinite; }
-  .tape-window:hover .tape-track.rolling { animation-play-state: paused; }
   .tape-set { display:inline-flex; gap:22px; padding-right:22px; white-space:nowrap; align-items:baseline; }
-  @keyframes tapeRoll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
   .tape-item { font-family:var(--mono); font-size:12px; color:var(--ink-dim); cursor:pointer; }
   .tape-item b { font-family:var(--serif); font-weight:600; font-size:13.5px; color:var(--ink); margin-right:5px; }
   .tape-item .lit { color: var(--up); }
   .tape-item:hover, .tape-item:hover b { color: var(--teal); }
   .tape-btn { flex:0 0 auto; padding:3px 7px; font-size:11px; }
+  .tape-nav { flex:0 0 auto; display:none; padding:2px 6px; font-size:13px; line-height:1.1; }
   .tape-msg { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   @media (max-width: 620px){ .tape-label { display:none; } }
-  @media (prefers-reduced-motion: reduce){
-    .tape-track.rolling { animation:none; }
-    .tape-window { overflow-x:auto; }
-  }
 
   /* Today's Top Picks, condensed so it doesn't eat a phone screen. */
   #dailyPicksPanel { padding:12px 14px; margin-bottom:14px; }
@@ -199,9 +258,12 @@
       <div class="title-row">
         <img src="data:image/png;base64,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" alt="Pullback logo">
         <h1>Pullback Stock Technical Analysis</h1>
+        <button class="blurb-toggle" id="blurbToggle" onclick="toggleBlurb()" aria-expanded="false" aria-controls="headerBlurb" title="What this tool does">About</button>
       </div>
+      <div class="header-blurb" id="headerBlurb">
       <div class="byline">Developed by ClaudeAI, Directed by JLooi</div>
       <div class="sub">Screens a candidate pool of US stocks &mdash; any market cap &mdash; across pullback depth bands (under 5%, 5&ndash;10%, 10&ndash;15%, 15&ndash;30%, 30%+) for renewed upward momentum, maps support/resistance, scores setup quality and the odds of a level test, and surfaces the top matches (use the Limit selector to show 10/20/50/all).</div>
+      </div>
     </div>
     <div class="stamp" id="stamp"></div>
   </header>
@@ -265,7 +327,7 @@
     <select id="sectorMode" onchange="render()" title="Rebuilds automatically from whatever sectors are present in the loaded data">
       <option value="all">Sector: all</option>
     </select>
-    <span class="hint">Click a column header to sort ascending/descending. Paste your Apps Script URL, click "Fetch live data", or add/edit rows by hand &mdash; everything recalculates live.</span>
+    <span class="hint">Click a column header to sort ascending/descending. Paste your Apps Script URL, click "Fetch live data", or edit a sample row by hand &mdash; everything recalculates live.</span>
   </div>
   <div class="panel" id="liveStatusPanel" style="display:none; padding:10px 16px;">
     <span class="hint" id="liveStatus"></span>
@@ -276,8 +338,14 @@
       <button onclick="searchTicker()">Search</button>
     </span>
     <button onclick="clearSearch()" id="clearSearchBtn" style="display:none;">&times; Clear search</button>
-    <input type="text" id="addSymbol" class="cell" style="width:220px;" placeholder="TICKER, TICKER, TICKER&hellip;" onkeydown="if(event.key==='Enter')addTicker()" title="One ticker, or several separated by commas, spaces, or line breaks (pasting a column from Excel/Sheets also works)">
-    <button onclick="addTicker()">Add row(s) manually</button>
+    <select id="colMode" onchange="applyColumnMode()" title="Key columns only keeps the screen readable on a phone; switch to all columns for the full picture">
+      <option value="key">Columns: key only</option>
+      <option value="all">Columns: all</option>
+    </select>
+    <select id="density" onchange="applyDensity()" title="Row height — compact fits roughly a third more rows on screen">
+      <option value="compact">Rows: compact</option>
+      <option value="roomy">Rows: roomy</option>
+    </select>
   </div>
 
   <div class="panel" style="padding:0; overflow-x:auto;">
@@ -288,9 +356,9 @@
           <th data-key="sector">Sector</th>
           <th data-key="price" title="Current share price">Price</th>
           <th data-key="buyZoneLow" title="Heuristic reference range for scaling in, built off the nearest of up to 3 trailing-1-year support zones (or the swing low if no zone was found) plus a bit of ATR room above it — not a signal, just a framework. Tap a row for the full multi-zone ladder. See Methodology">Buy Zone</th>
+          <th data-key="rsi14" title="RSI(14) plus direction: ↑ rising, ↓ falling, → flat vs. ~5 trading days ago. A '50↑' badge means it just crossed back above the midline">RSI</th>
           <th data-key="technicalConfirmationScore" title="Technical Confirmation — EMA stack, ADX/DI, MACD, ROC, Bollinger position, relative volume and price structure">Tech Confirm</th>
           <th data-key="macdHistogram" title="MACD(12,26,9) histogram">MACD</th>
-          <th data-key="rsi14" title="RSI(14) plus direction: ↑ rising, ↓ falling, → flat vs. ~5 trading days ago. A '50↑' badge means it just crossed back above the midline">RSI</th>
           <th data-key="setupQualityScore" title="Heuristic 0-100 Setup Quality score, see Methodology">Setup Quality<br><span style="font-size:9px;font-weight:400;color:var(--up);text-transform:none;">for pullbacks</span></th>
           <th data-key="trendContinuationScore" title="Trend Continuation — a separate lens from Setup Quality/Test-Support, for uptrends that haven't pulled back: MA trend, ADX/DI, EMA stack, relative strength vs S&P, MACD, price structure. See Methodology">Trend Cont.<br><span style="font-size:9px;font-weight:400;color:var(--brass);text-transform:none;">no pullback yet</span></th>
           <th data-key="currentDrawdownPct" title="How far price is BELOW the 6M high right now — peak to current. This is now the primary pullback measure used for the depth band and default sort">Cur DD %</th>
@@ -313,8 +381,14 @@
 
   <div class="panel" id="pager" style="display:none; align-items:center; justify-content:center; gap:14px; padding:10px 16px;">
     <button onclick="changePage(-1)" id="pagerPrev">&larr; Prev</button>
-    <span id="pagerLabel" style="font-family:var(--mono); font-size:12.5px; color:var(--ink-dim);"></span>
+    <span class="pagerJump">Page
+      <input type="number" id="pageInput" min="1" step="1" inputmode="numeric"
+             onchange="gotoPageFromInput()" onkeydown="if(event.key==='Enter'){this.blur();gotoPageFromInput();}"
+             onclick="this.select()" title="Type a page number and press Enter">
+      of <span id="pageTotal"></span>
+    </span>
     <button onclick="changePage(1)" id="pagerNext">Next &rarr;</button>
+    <span class="hint" id="pagerCount"></span>
   </div>
 
   <div class="panel" id="detailPanel" style="display:none;"></div>
@@ -427,36 +501,6 @@ function clearAll(){
   selected = null;
   render();
 }
-// Accepts one ticker or many at once — split on commas, whitespace, and line
-// breaks so a paste from Excel/Sheets (a column, or a comma/space separated
-// list) adds every symbol in one go instead of requiring the field to be
-// cleared and retyped per ticker.
-function addTicker(){
-  const input = document.getElementById('addSymbol');
-  const raw = input.value.trim();
-  if (!raw) return;
-  const syms = raw.split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
-  let added = 0, skipped = 0;
-  syms.forEach(sym => {
-    if (!data.find(d => d.sym === sym)){
-      data.push({sym, sector:'', price:'', high:'', low:'', swing:'', trend:'flat', vol:'flat'});
-      added++;
-    } else {
-      skipped++;
-    }
-  });
-  input.value = '';
-  render();
-  if (syms.length > 1){
-    const statusEl = document.getElementById('liveStatus');
-    const panel = document.getElementById('liveStatusPanel');
-    if (statusEl && panel){
-      panel.style.display = '';
-      statusEl.textContent = `Added ${added} ticker${added===1?'':'s'}` + (skipped ? `, ${skipped} already in the list` : '') + '.';
-    }
-  }
-}
-
 function num(v){ const n = parseFloat(v); return isNaN(n) ? null : n; }
 
 // Buckets: micro <$300M, small $300M-$2B, mid $2B-$10B, large $10B-$200B,
@@ -1297,6 +1341,17 @@ function changePage(delta){
   render();
 }
 
+// Typed page number. Out-of-range values are clamped rather than rejected —
+// paginateAndRender already pins currentPage to the valid range, and the box
+// is rewritten from the real page on the way back, so a bad entry snaps to
+// the nearest real page instead of erroring.
+function gotoPageFromInput(){
+  const box = document.getElementById('pageInput');
+  const n = parseInt(box.value, 10);
+  if (!isNaN(n)) currentPage = Math.max(1, n);
+  render();
+}
+
 function paginateAndRender(rows, signature){
   const total = rows.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -1312,7 +1367,11 @@ function paginateAndRender(rows, signature){
     pager.style.display = 'none';
   } else {
     pager.style.display = 'flex';
-    document.getElementById('pagerLabel').textContent = `Page ${currentPage} of ${totalPages} (${total} total)`;
+    const box = document.getElementById('pageInput');
+    box.max = totalPages;
+    if (document.activeElement !== box) box.value = currentPage;
+    document.getElementById('pageTotal').textContent = totalPages;
+    document.getElementById('pagerCount').textContent = `${total} rows`;
     document.getElementById('pagerPrev').disabled = currentPage <= 1;
     document.getElementById('pagerNext').disabled = currentPage >= totalPages;
   }
@@ -1555,39 +1614,72 @@ function renderAlerts(rows){
 
   panel.innerHTML = `
     <span class="tape-label">${hits.length} in zone</span>
-    <span class="tape-window"><span class="tape-track"><span class="tape-set">${items}</span><span class="tape-set" aria-hidden="true">${items}</span></span></span>
+    <button class="tape-nav" id="tapeLeft" onclick="nudgeAlertTape(-1)" title="Scroll left">&lsaquo;</button>
+    <span class="tape-window"><span class="tape-track"><span class="tape-set">${items}</span><span class="tape-set" aria-hidden="true">${items}</span><span class="tape-set" aria-hidden="true">${items}</span></span></span>
+    <button class="tape-nav" id="tapeRight" onclick="nudgeAlertTape(1)" title="Scroll right">&rsaquo;</button>
     ${buttons}`;
 
   startAlertTape(panel);
 }
 
-// Duplicate-and-translate marquee: the track holds two identical sets, each
-// carrying its own trailing gap, so translating exactly -50% lands on the
-// start of the second copy with no visible seam. If one set already fits the
-// strip there's nothing to scroll, so the copy is dropped and the animation
-// never starts.
+// The strip is a real scroll container holding three identical copies of the
+// alert list. It sits parked on the middle copy, so scrolling off either end
+// can be silently wrapped back by exactly one copy-width — which makes it feel
+// endless in both directions whether you swipe, drag, shift+wheel, or tap the
+// arrows. A slow automatic drift runs on top of that and steps aside as soon
+// as you touch it. If one copy already fits the strip there's nothing to
+// scroll, so the extras and the arrows are dropped entirely.
+let tapeNudge = null;
+
+function nudgeAlertTape(dir){ if (tapeNudge) tapeNudge(dir); }
+
 function startAlertTape(panel){
   const win   = panel.querySelector('.tape-window');
   const track = panel.querySelector('.tape-track');
   const sets  = panel.querySelectorAll('.tape-set');
-  if (!win || !track || sets.length < 2) return;
+  if (!win || !track || sets.length < 3) return;
+  tapeNudge = null;
 
   requestAnimationFrame(() => {
-    const setWidth = sets[0].getBoundingClientRect().width;
-    if (setWidth <= win.clientWidth + 2){
+    const W = sets[0].getBoundingClientRect().width;
+    if (W <= win.clientWidth + 2){
       sets[1].style.display = 'none';
-      track.classList.remove('rolling');
+      sets[2].style.display = 'none';
       return;
     }
-    // ~55px/sec reads comfortably; floor it so a short list isn't a blur.
-    track.style.setProperty('--tape-dur', Math.max(14, setWidth / 55).toFixed(1) + 's');
-    track.classList.add('rolling');
-  });
 
-  // Hover pauses on desktop (CSS); a touch does the same, so tapping a moving
-  // name doesn't become a coordination exercise on a phone.
-  win.addEventListener('touchstart', () => { track.style.animationPlayState = 'paused'; }, {passive:true});
-  win.addEventListener('touchend',   () => { setTimeout(() => { track.style.animationPlayState = ''; }, 2500); }, {passive:true});
+    panel.querySelectorAll('.tape-nav').forEach(b => b.style.display = 'inline-block');
+    win.scrollLeft = W; // park on the middle copy
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const SPEED = 32; // px/sec — slow enough to read a symbol as it passes
+    let paused = false, idleTimer = null, smoothUntil = 0, last = performance.now();
+
+    const holdFor = ms => { paused = true; clearTimeout(idleTimer); idleTimer = setTimeout(() => { paused = false; }, ms); };
+    ['pointerdown','touchstart','wheel'].forEach(ev => win.addEventListener(ev, () => holdFor(3500), {passive:true}));
+    win.addEventListener('mouseenter', () => { paused = true; clearTimeout(idleTimer); });
+    win.addEventListener('mouseleave', () => { holdFor(400); });
+
+    tapeNudge = dir => {
+      holdFor(5000);
+      smoothUntil = performance.now() + 700;
+      win.scrollBy({ left: dir * Math.max(160, win.clientWidth * 0.8), behavior: 'smooth' });
+    };
+
+    function step(now){
+      if (!document.body.contains(win)) return; // panel was rebuilt — let this loop die
+      const dt = Math.min(now - last, 100) / 1000;
+      last = now;
+      if (!paused && !reduceMotion) win.scrollLeft += SPEED * dt;
+      // Wrap by one copy-width, but never mid-flight of a smooth arrow scroll.
+      if (now > smoothUntil){
+        if (win.scrollLeft >= 2 * W) win.scrollLeft -= W;
+        else if (win.scrollLeft < 1) win.scrollLeft += W;
+      }
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
 }
 
 function renderDailyPicks(rows){
@@ -1741,7 +1833,7 @@ function render(){
 function renderRows(rows){
   const tbody = document.getElementById('tbody');
   if (rows.length===0){
-    tbody.innerHTML = '<tr><td colspan="20" class="empty">Nothing loaded yet — click "Fetch live data," "Load sample data," or add a ticker manually below.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="21" class="empty">Nothing loaded yet — click "Fetch live data" or "Load sample data" above.</td></tr>';
     return;
   }
 
@@ -1904,6 +1996,47 @@ function openDetail(sym, silent){
   `;
   if (!silent) panel.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
+
+// --- Header blurb --------------------------------------------------------
+function toggleBlurb(){
+  const blurb = document.getElementById('headerBlurb');
+  const btn = document.getElementById('blurbToggle');
+  const open = blurb.classList.toggle('open');
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+// Wide screens have room for the description; narrow ones don't, so it starts
+// folded there and the table sits that much closer to the top.
+(function initBlurb(){
+  if (window.innerWidth >= 1000){
+    document.getElementById('headerBlurb').classList.add('open');
+    document.getElementById('blurbToggle').setAttribute('aria-expanded','true');
+  }
+})();
+
+// --- Table density and column sets ---------------------------------------
+// The full table is 21 columns wide, which is unreadable on a phone without
+// a lot of sideways scrolling. "Key only" hides the secondary columns (see
+// the #tbl.cols-key rules in the stylesheet); the Symbol column is sticky
+// either way so you never lose the name you're reading. Both are pure CSS
+// toggles, so nothing has to re-render when they change.
+function applyColumnMode(){
+  const tbl = document.getElementById('tbl');
+  const mode = document.getElementById('colMode').value;
+  tbl.classList.toggle('cols-key', mode === 'key');
+}
+function applyDensity(){
+  const tbl = document.getElementById('tbl');
+  tbl.classList.toggle('roomy', document.getElementById('density').value === 'roomy');
+}
+// Narrow screen: start in the compact, key-columns-only view. Wide screen:
+// show everything, since there's room for it.
+(function initTableView(){
+  const narrow = window.innerWidth < 1000;
+  document.getElementById('colMode').value = narrow ? 'key' : 'all';
+  document.getElementById('density').value = narrow ? 'compact' : 'roomy';
+  applyColumnMode();
+  applyDensity();
+})();
 
 // Wire up clickable column-header sorting (replaces the old "Sort:" dropdown).
 document.querySelectorAll('#theadRow th[data-key]').forEach(th=>{

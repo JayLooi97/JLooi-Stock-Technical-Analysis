@@ -143,7 +143,52 @@
   .bar-track { height:5px; background:#181B21; border-radius:3px; margin-top:5px; overflow:hidden; }
   .bar-fill { height:100%; background: linear-gradient(90deg, var(--cobalt), var(--skyblue)); }
 
-  footer { margin-top: 26px; padding-top: 14px; border-top:1px solid var(--line); color: var(--ink-dim); font-size:12px; }
+  /* Buy-zone alerts as a single ticker-tape row rather than a stacked panel.
+     It only scrolls when the content is actually wider than the strip, and it
+     pauses on hover/tap so a name can be read and clicked while it moves. */
+  #alertPanel.tape-panel { display:flex; align-items:center; gap:9px; padding:7px 10px; margin-bottom:14px; }
+  .tape-label { flex:0 0 auto; font-family:var(--mono); font-size:10px; letter-spacing:0.6px;
+                text-transform:uppercase; color:var(--teal); white-space:nowrap; }
+  .tape-window { flex:1 1 auto; min-width:0; overflow:hidden;
+    -webkit-mask-image:linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
+            mask-image:linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent); }
+  .tape-track { display:inline-flex; }
+  .tape-track.rolling { animation: tapeRoll var(--tape-dur, 36s) linear infinite; }
+  .tape-window:hover .tape-track.rolling { animation-play-state: paused; }
+  .tape-set { display:inline-flex; gap:22px; padding-right:22px; white-space:nowrap; align-items:baseline; }
+  @keyframes tapeRoll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .tape-item { font-family:var(--mono); font-size:12px; color:var(--ink-dim); cursor:pointer; }
+  .tape-item b { font-family:var(--serif); font-weight:600; font-size:13.5px; color:var(--ink); margin-right:5px; }
+  .tape-item .lit { color: var(--up); }
+  .tape-item:hover, .tape-item:hover b { color: var(--teal); }
+  .tape-btn { flex:0 0 auto; padding:3px 7px; font-size:11px; }
+  .tape-msg { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  @media (max-width: 620px){ .tape-label { display:none; } }
+  @media (prefers-reduced-motion: reduce){
+    .tape-track.rolling { animation:none; }
+    .tape-window { overflow-x:auto; }
+  }
+
+  /* Today's Top Picks, condensed so it doesn't eat a phone screen. */
+  #dailyPicksPanel { padding:12px 14px; margin-bottom:14px; }
+  .picks-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+  .picks-head h2 { margin:0; }
+  .picks-why summary { cursor:pointer; color:var(--steel); font-size:11.5px; list-style:none; }
+  .picks-why summary::-webkit-details-marker { display:none; }
+  .picks-why summary::after { content:' \25BE'; }
+  .picks-why[open] summary::after { content:' \25B4'; }
+  .picks-why p { margin:6px 0 0; font-size:11.5px; line-height:1.45; color:var(--ink-dim); }
+  .picks-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(156px,1fr)); gap:8px; }
+  .pick-card { background:var(--panel-raised); border:1px solid var(--line); border-radius:3px; padding:8px 9px; cursor:pointer; }
+  .pick-card:hover { border-color: var(--teal); }
+  .pick-top { display:flex; justify-content:space-between; align-items:baseline; gap:6px; }
+  .pick-sym { font-family:var(--serif); font-weight:700; font-size:14.5px; }
+  .pick-top .badge { padding:1px 5px; font-size:10px; }
+  .pick-meta { font-size:10.5px; color:var(--ink-dim); line-height:1.35; margin:1px 0 5px; }
+  .pick-pillars { display:flex; flex-wrap:wrap; gap:1px 8px; font-family:var(--mono); font-size:10px; line-height:1.45; }
+  .pick-pillars .on { color: var(--up); }
+  .pick-pillars .off { color: var(--steel-dim); }
+
 </style>
 </head>
 <body>
@@ -156,7 +201,7 @@
         <h1>Pullback Stock Technical Analysis</h1>
       </div>
       <div class="byline">Developed by ClaudeAI, Directed by JLooi</div>
-      <div class="sub">Screens a candidate pool of US stocks &mdash; any market cap &mdash; across four pullback depth bands (5&ndash;10%, 10&ndash;15%, 15&ndash;30%, 30%+) for renewed upward momentum, maps support/resistance, scores setup quality and the odds of a level test, and surfaces the top matches (use the Limit selector to show 5/10/20/50/all).</div>
+      <div class="sub">Screens a candidate pool of US stocks &mdash; any market cap &mdash; across pullback depth bands (under 5%, 5&ndash;10%, 10&ndash;15%, 15&ndash;30%, 30%+) for renewed upward momentum, maps support/resistance, scores setup quality and the odds of a level test, and surfaces the top matches (use the Limit selector to show 10/20/50/all).</div>
     </div>
     <div class="stamp" id="stamp"></div>
   </header>
@@ -177,7 +222,7 @@
     <button class="primary" onclick="fetchAllLive()" id="liveBtn">Fetch live data (Google Sheet)</button>
     <select id="backendPreset" onchange="applyBackendPreset()" title="Pick a saved backend, or choose Custom to paste your own URL">
       <option value="">Custom URL&hellip;</option>
-      <option value="https://script.google.com/macros/s/AKfycbzHGxJNZu5PyKjiG90lwcdTnk0woYnRleTVfmTVzI3zDsSgrpPmqfUYb4k3gNeB-SFV/exec">US S&amp;P500</option>
+      <option value="https://script.google.com/macros/s/AKfycbzHGxJNZu5PyKjiG90lwcdTnk0woYnRleTVfmTVzI3zDsSgrpPmqfUYb4k3gNeB-SFV/exec">Top US stock market</option>
     </select>
     <input type="text" id="backendUrl" class="cell" style="width:320px;" placeholder="Paste your Apps Script /exec URL here">
     <button onclick="loadSample()">Load sample data</button>
@@ -191,13 +236,13 @@
     </select>
     <select id="limitMode" onchange="render()" title="Caps how many rows are shown for the 'Show' selection above, so you don't have to keep scrolling/paging through everything">
       <option value="all">Limit: show all</option>
-      <option value="5">Limit: top 5</option>
       <option value="10">Limit: top 10</option>
       <option value="20">Limit: top 20</option>
       <option value="50">Limit: top 50</option>
     </select>
     <select id="bandMode" onchange="render()">
       <option value="all">Depth: all bands</option>
+      <option value="lt5">Depth: under 5%</option>
       <option value="5-10">Depth: 5&ndash;10%</option>
       <option value="10-15">Depth: 10&ndash;15%</option>
       <option value="15-30">Depth: 15&ndash;30%</option>
@@ -220,7 +265,7 @@
     <select id="sectorMode" onchange="render()" title="Rebuilds automatically from whatever sectors are present in the loaded data">
       <option value="all">Sector: all</option>
     </select>
-    <span class="hint">Click a column header to sort ascending/descending. Paste your Apps Script URL, click "Fetch live data" (see footer for setup), or add/edit rows by hand &mdash; everything recalculates live.</span>
+    <span class="hint">Click a column header to sort ascending/descending. Paste your Apps Script URL, click "Fetch live data", or add/edit rows by hand &mdash; everything recalculates live.</span>
   </div>
   <div class="panel" id="liveStatusPanel" style="display:none; padding:10px 16px;">
     <span class="hint" id="liveStatus"></span>
@@ -289,10 +334,6 @@
     </ul>
     <p>Tap any row to see the full detail panel — support/resistance levels, the full buy-zone ladder, and every score broken down.</p>
   </details>
-
-  <footer>
-    "Fetch live data" calls a Google Apps Script Web App (Code.gs) deployed from your own Google Sheet &mdash; paste the URL it gives you (ending in <code>/exec</code>) into the field above. The Sheet's "Data" tab pulls ~3 years (1095 calendar days, resolving to roughly that many trading days) of daily prices per ticker via <code>GOOGLEFINANCE</code> &mdash; the 6-month slice drives the main pullback numbers, the trailing 1-year slice drives the Key Support/Resistance zones and Buy Zone ladder, and the full multi-year history feeds the 200-day MA and the 21D Win% historical-analogue engine &mdash; and the script reads that, computes everything, and returns it via <b>JSONP</b> &mdash; a script-tag loading trick that talks directly to Google with no proxy or relay involved, avoiding the CORS restrictions a plain fetch() runs into. Add "SPY" as one of the tickers for the vs-S&amp;P-500 comparison to work. Earnings dates are deliberately not tracked here &mdash; <code>GOOGLEFINANCE</code> has no earnings-date field, so the tool could never source them itself, and a half-populated column is worse than none. Check the calendar yourself before acting on anything this flags. A large ticker list (hundreds of symbols) can take up to a minute for Apps Script to compute &mdash; that's normal, not a failure. If a fetch fails, it's almost always the deployment access setting (must be "Anyone" can access) or the Sheet still calculating &mdash; manual entry and "Load sample data" always work as a fallback.
-  </footer>
 
 </div>
 
@@ -1031,8 +1072,13 @@ function maTrendBadge(t){
   return '&mdash;';
 }
 function bandBadge(band){
-  const labels = {'5-10':'5-10%', '10-15':'10-15%', '15-30':'15-30%', '30plus':'30%+'};
-  return labels[band] ? `<span class="badge pull">${labels[band]}</span>` : '';
+  const labels = {'lt5':'&lt;5%', '5-10':'5-10%', '10-15':'10-15%', '15-30':'15-30%', '30plus':'30%+'};
+  if (!labels[band]) return '';
+  // Under 5% isn't one of the four screened pullback bands — it's "barely off
+  // the high," listed so those names are findable, not flagged as a setup.
+  // Muted styling keeps that distinction visible at a glance.
+  if (band === 'lt5') return `<span class="badge" style="color:var(--ink-dim);border:1px solid var(--steel-dim);">${labels[band]}</span>`;
+  return `<span class="badge pull">${labels[band]}</span>`;
 }
 function relClass(v){
   if (v==null) return '';
@@ -1467,50 +1513,81 @@ function pushAlertNotifications(hits){
   fresh.forEach(h => alertedSymbols.add(h.r.sym));
 }
 
+// The alert panel is a one-line ticker strip, not a stacked list — it sits
+// above everything else on every render, so it has to stay out of the way.
+// Rebuilt only when the alert set (or the notify toggle) actually changes,
+// otherwise every filter change would restart the scroll from the left.
+let alertTapeSig = null;
+
 function renderAlerts(rows){
   const panel = document.getElementById('alertPanel');
   const hits = evaluateAlerts(rows);
   pushAlertNotifications(hits);
 
-  const notifyLabel = alertNotifyEnabled ? 'Notifications on' : 'Enable notifications';
-  const header = `
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-      <h2 style="margin:0;">Buy Zone Alerts</h2>
-      <span style="display:flex; gap:8px;">
-        <button onclick="toggleAlertNotifications()" style="padding:6px 10px;">${notifyLabel}</button>
-        <button onclick="resetAlerts()" title="Allow already-announced names to alert again" style="padding:6px 10px;">Reset</button>
-      </span>
-    </div>`;
+  const sig = alertNotifyEnabled + '|' + hits.map(h =>
+    `${h.r.sym}:${h.gl.count}:${h.zoneIdx}:${fmt(num(h.r.price),2)}`).join(',');
+  if (sig === alertTapeSig && panel.innerHTML) return;
+  alertTapeSig = sig;
+
+  const notifyLabel = alertNotifyEnabled ? 'Notify: on' : 'Notify';
+  const buttons = `
+    <button class="tape-btn" onclick="toggleAlertNotifications()" title="Browser notification when a name enters a buy zone">${notifyLabel}</button>
+    <button class="tape-btn" onclick="resetAlerts()" title="Allow already-announced names to alert again">Reset</button>`;
+
+  panel.className = 'panel tape-panel';
+  panel.style.display = 'flex';
 
   if (!hits.length){
-    panel.style.display = '';
-    panel.innerHTML = header + `<div class="hint" style="margin-top:8px;">Nothing is sitting inside a buy zone with ${ALERT_MIN_PILLARS}+ pillars confirmed right now. Re-fetch to re-check &mdash; prices here are delayed by up to ~20 minutes, so treat this as an end-of-day scan rather than an intraday trigger.</div>`;
+    panel.innerHTML = `
+      <span class="tape-label">Buy zone</span>
+      <span class="tape-msg hint" title="Prices here are delayed by up to ~20 minutes, so treat this as an end-of-day scan rather than an intraday trigger. Re-fetch to re-check.">Nothing in a buy zone with ${ALERT_MIN_PILLARS}+ pillars right now.</span>
+      ${buttons}`;
     return;
   }
 
-  panel.style.display = '';
-  panel.innerHTML = header + `
-    <div class="hint" style="margin:8px 0 12px;">${hits.length} name${hits.length===1?'':'s'} inside a buy zone with ${ALERT_MIN_PILLARS}+ of 6 pillars confirmed and no chase/stale veto. Scans everything loaded, ignoring the filters below. Delayed quotes &mdash; verify the level before acting.</div>
-    ${hits.map(h => {
-      const price = num(h.r.price);
-      const z = h.zone;
-      const rr = (z.target !== null && z.stop !== null && price !== null && (price - z.stop) > 0)
-        ? ((z.target - price) / (price - z.stop)) : null;
-      return `
-      <div style="border:1px solid var(--teal-dim); border-left:3px solid var(--teal); border-radius:3px; padding:10px 12px; margin-bottom:8px; background:var(--panel-raised); cursor:pointer;"
-           onclick="openDetail('${h.r.sym}')">
-        <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:baseline;">
-          <span style="font-family:var(--mono); font-size:15px; font-weight:600;">${h.r.sym}</span>
-          <span style="font-family:var(--mono); font-size:12.5px; color:var(--ink-dim);">
-            ${fmt(price,2)} in zone ${h.zoneIdx+1} (${fmt(z.low,2)}&ndash;${fmt(z.high,2)})
-            &middot; stop ${fmt(z.stop,2)}${z.target!==null?` &middot; target ${fmt(z.target,2)}`:''}${rr!==null?` &middot; R:R ${fmt(rr,2)}`:''}
-          </span>
-        </div>
-        <div style="font-size:12px; color:var(--ink-dim); margin-top:5px;">
-          <span style="color:var(--up);">${h.gl.count}/${h.gl.total} confirmed:</span> ${h.reasons.join(', ')}${h.missing.length?` <span style="opacity:0.7;">&middot; still missing: ${h.missing.join(', ')}</span>`:''}
-        </div>
-      </div>`;
-    }).join('')}`;
+  const items = hits.map(h => {
+    const price = num(h.r.price);
+    const z = h.zone;
+    const title = `${h.gl.count}/${h.gl.total} confirmed: ${h.reasons.join(', ')}` +
+                  (h.missing.length ? ` — still missing: ${h.missing.join(', ')}` : '');
+    return `<span class="tape-item" onclick="openDetail('${h.r.sym}')" title="${title}"><b>${h.r.sym}</b><span class="lit">${h.gl.count}/${h.gl.total}</span> &middot; ${fmt(price,2)} in zone ${h.zoneIdx+1} (${fmt(z.low,2)}&ndash;${fmt(z.high,2)}) &middot; stop ${fmt(z.stop,2)}</span>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <span class="tape-label">${hits.length} in zone</span>
+    <span class="tape-window"><span class="tape-track"><span class="tape-set">${items}</span><span class="tape-set" aria-hidden="true">${items}</span></span></span>
+    ${buttons}`;
+
+  startAlertTape(panel);
+}
+
+// Duplicate-and-translate marquee: the track holds two identical sets, each
+// carrying its own trailing gap, so translating exactly -50% lands on the
+// start of the second copy with no visible seam. If one set already fits the
+// strip there's nothing to scroll, so the copy is dropped and the animation
+// never starts.
+function startAlertTape(panel){
+  const win   = panel.querySelector('.tape-window');
+  const track = panel.querySelector('.tape-track');
+  const sets  = panel.querySelectorAll('.tape-set');
+  if (!win || !track || sets.length < 2) return;
+
+  requestAnimationFrame(() => {
+    const setWidth = sets[0].getBoundingClientRect().width;
+    if (setWidth <= win.clientWidth + 2){
+      sets[1].style.display = 'none';
+      track.classList.remove('rolling');
+      return;
+    }
+    // ~55px/sec reads comfortably; floor it so a short list isn't a blur.
+    track.style.setProperty('--tape-dur', Math.max(14, setWidth / 55).toFixed(1) + 's');
+    track.classList.add('rolling');
+  });
+
+  // Hover pauses on desktop (CSS); a touch does the same, so tapping a moving
+  // name doesn't become a coordination exercise on a phone.
+  win.addEventListener('touchstart', () => { track.style.animationPlayState = 'paused'; }, {passive:true});
+  win.addEventListener('touchend',   () => { setTimeout(() => { track.style.animationPlayState = ''; }, 2500); }, {passive:true});
 }
 
 function renderDailyPicks(rows){
@@ -1568,24 +1645,33 @@ function renderDailyPicks(rows){
 
   panel.style.display = 'block';
   if (!topPicks.length){
-    panel.innerHTML = `<h2>Today's Top Picks</h2><div class="hint">Nothing in the loaded universe clears the bar right now — no picks to flag today.</div>`;
+    panel.innerHTML = `<div class="picks-head"><h2>Today's Top Picks</h2></div><div class="hint">Nothing in the loaded universe clears the bar right now &mdash; no picks to flag today.</div>`;
     return;
   }
+
+  // The reasoning behind the selection is worth keeping, but it's read once
+  // and then it's just a wall of text above the cards — so it lives behind a
+  // one-line disclosure instead of permanently occupying half a phone screen.
+  const why = fallback
+    ? `Nothing cleared the usual checklist bar today, so these are today's top percentile-rank names instead (${DAILY_PICKS_ADAPTIVE_FALLBACK_PCT}th pct.+ of the loaded universe) &mdash; a softer, regime-adjusted "best of what's here," not a confirmed setup.`
+    : `Ranked by how many of the ${topPicks[0].gl.total} confirmation pillars are green. Fewer than ${DAILY_PICKS_COUNT} cards just means fewer than ${DAILY_PICKS_COUNT} names cleared the bar today.`;
+  const whyMore = ` No size/market-cap floor &mdash; the best setup wins regardless of cap (shown on each card)${DAILY_PICKS_SECTOR_CAP !== null ? `, at most ${DAILY_PICKS_SECTOR_CAP} per sector` : `, no per-sector limit`}, and it scans everything loaded regardless of the filters below. Tap a card for full detail.`;
+
   panel.innerHTML = `
-    <h2>Today's Top Picks</h2>
-    <div class="hint" style="margin-bottom:10px;">${fallback
-      ? `Nothing cleared the usual checklist bar today, so these are today's top percentile-rank names instead (${DAILY_PICKS_ADAPTIVE_FALLBACK_PCT}th pct.+ of the loaded universe) &mdash; a softer, regime-adjusted "best of what's here," not a confirmed setup.`
-      : `Top ${topPicks.length} by how many of the ${topPicks[0].gl.total} confirmation pillars are green &mdash; tap a card for full detail. Fewer than ${DAILY_PICKS_COUNT} cards just means fewer than ${DAILY_PICKS_COUNT} names cleared the bar today.`} No size/market-cap floor &mdash; the best setup wins regardless of cap (shown on each card for your own judgment)${DAILY_PICKS_SECTOR_CAP !== null ? `, at most ${DAILY_PICKS_SECTOR_CAP} per sector` : `, no per-sector limit &mdash; the best setups win even if two land in the same sector`}, and scans everything loaded regardless of the filters below.</div>
-    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:12px;">
+    <div class="picks-head">
+      <h2>Today's Top Picks</h2>
+      <details class="picks-why"><summary>${fallback ? 'soft day &mdash; why' : `top ${topPicks.length} by pillars`}</summary><p>${why}${whyMore}</p></details>
+    </div>
+    <div class="picks-grid">
       ${topPicks.map(({r,gl,pctRank})=>`
-        <div style="background:var(--panel-raised); border:1px solid var(--line); border-radius:4px; padding:12px 14px; cursor:pointer;" onclick="openDetail('${r.sym}')">
-          <div style="display:flex; justify-content:space-between; align-items:baseline;">
-            <span style="font-family:var(--serif); font-weight:700; font-size:16px;">${r.sym}</span>
+        <div class="pick-card" onclick="openDetail('${r.sym}')">
+          <div class="pick-top">
+            <span class="pick-sym">${r.sym}</span>
             <span class="badge mom-up">${fallback ? (pctRank!=null?'pct. '+pctRank:'&mdash;') : gl.count+'/'+gl.total}</span>
           </div>
-          <div class="hint" style="margin:2px 0 8px;">${r.sector||'&mdash;'} &middot; ${fmt(num(r.price),2)} &middot; ${fmtMarketCap(r.marketCap)}${pctRank!=null?` &middot; ${pctRank}th pct. today`:''}</div>
-          <div style="font-size:12px; line-height:2;">
-            ${gl.items.map(i=>`<span style="display:inline-block; margin:0 8px 3px 0; color:${i.pass?'var(--up)':'var(--ink-dim)'};">${i.pass?'&#9989;':'&#11036;'} ${i.label}</span>`).join('')}
+          <div class="pick-meta">${r.sector||'&mdash;'} &middot; ${fmt(num(r.price),2)} &middot; ${fmtMarketCap(r.marketCap)}${pctRank!=null?` &middot; ${pctRank}th pct.`:''}</div>
+          <div class="pick-pillars">
+            ${gl.items.map(i=>`<span class="${i.pass?'on':'off'}" title="${i.label}">${i.pass?'&#9679;':'&#9675;'} ${i.label}</span>`).join('')}
           </div>
         </div>
       `).join('')}
@@ -1601,7 +1687,7 @@ function render(){
   const liquidityMin = parseFloat(document.getElementById('liquidityMode').value) || 0;
   const marketCapMode = document.getElementById('marketCapMode').value;
   const sectorMode = document.getElementById('sectorMode').value;
-  const limitMode = document.getElementById('limitMode').value; // '5' | '10' | '20' | '50' | 'all'
+  const limitMode = document.getElementById('limitMode').value; // '10' | '20' | '50' | 'all'
   const limitN = limitMode==='all' ? null : parseInt(limitMode,10);
 
   let rows = data.map(r => ({r, c: computeRow(r)}));

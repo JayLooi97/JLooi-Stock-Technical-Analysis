@@ -952,6 +952,16 @@ function computeRow(r){
     // ADX/EMA entirely) for the same reason as Setup Quality's reweighting —
     // a corner solution is more fragile than one that still keeps every
     // component contributing something.
+    //
+    // RE-VALIDATED on the larger universe (~830 tickers, 48 dates, 7,048
+    // observations inside this score's own intended population). This is
+    // the ONE re-weighting in the tool that held up: top-half vs
+    // bottom-half 21-day spread vs SPY of +1.26pp, and — unlike Setup
+    // Quality below — it was stable across the window rather than
+    // front-loaded (+1.27pp in the first half, +1.25pp in the second).
+    // The old 25/20/15/10 weights came in at +1.19pp, so the improvement
+    // itself is within noise; what's meaningful is that the score's signal
+    // doesn't evaporate out-of-period the way Setup Quality's does.
     add(structScore, 40);
 
     if (wSum > 0){
@@ -1249,6 +1259,16 @@ function paginateAndRender(rows, signature){
 // exists — full de-duplication would need reworking those composites
 // themselves — but this removes the direct double-counting the old
 // 11-item version had.
+//
+// WHAT THE COUNT IS AND ISN'T: a replay across 48 historical dates and
+// ~830 tickers (38,320 observations) found the pillar count is NOT
+// monotonic with what happens next. Mean 21-day return vs SPY by count:
+// 0/6 +0.9pp, 1/6 +0.6, 2/6 +1.0, 3/6 +0.6, 4/6 +1.4, 5/6 -2.9 (n=63),
+// 6/6 -2.9 (n=1). More green lights did not mean better odds, and the
+// high-count buckets are far too thin to read anything into either way.
+// Treat this as a STRUCTURED CHECKLIST — "which specific things are and
+// aren't confirmed on this name right now," which is genuinely useful for
+// deciding what to look at — and NOT as a score where 5/6 beats 3/6.
 function greenLightChecklist(r, c){
   const priceNum = num(r.price);
   const inZone = priceNum!==null && c.buyZones.some(z => priceNum>=z.low && priceNum<=z.high);
@@ -1295,11 +1315,30 @@ function compositeStrength(r, c){
 // the best setup wins regardless of market cap; each card shows its
 // market cap directly so size is visible for your own judgment rather
 // than pre-filtered away.
-// At most this many picks from the same sector — otherwise 3 "independent"
-// picks can quietly be one sector bet shown three times. Blank/unknown
-// sectors aren't capped against each other; there's no real diversity
-// signal in "unknown".
-const DAILY_PICKS_SECTOR_CAP = 1;
+// How many names to surface each day. Raised from 3 to 5 as the loaded
+// universe grew: a replay of this exact selection rule across 48 historical
+// dates and ~830 tickers showed the per-date spread of the basket's own
+// 21-day return falling from 15.1pp (3 picks) to 10-12pp (5 picks), i.e.
+// one bad name stops dominating the whole day's read. Mean return went the
+// same direction (+1.58% -> +2.59%), though that difference is well inside
+// the noise on 48 dates and shouldn't be read as an edge — the dispersion
+// drop is the real, robust reason for 5 over 3. Note that fewer than this
+// many names clear the checklist bar on a typical day (~4.8 of 5), so a
+// 4-card day is normal, not a bug.
+const DAILY_PICKS_COUNT = 5;
+// At most this many picks from the same sector — otherwise several
+// "independent" picks can quietly be one sector bet shown several times.
+// Set to null to disable the cap entirely (the current setting): with 5
+// slots instead of 3 the cap binds often enough to leave slots unfilled
+// (avg 4.54 picks with cap=1 vs 4.81 without), and the same replay showed
+// no cost to dropping it — uncapped scored slightly HIGHER on mean excess
+// return (+1.48pp vs +1.15pp vs SPY) while still averaging 3.1 distinct
+// sectors across 5 picks, since the checklist rarely lights up across one
+// sector alone. Set this to 2 for a middle ground (4.79 picks, 3.3 sectors,
+// +1.33pp) if a day ever does come back looking like one sector bet.
+// Blank/unknown sectors are never capped against each other; there's no
+// real diversity signal in "unknown".
+const DAILY_PICKS_SECTOR_CAP = null;
 // If NOTHING clears the normal checklist bar (a genuinely quiet or weak
 // day), fall back to today's top percentile-rank name(s) instead of just
 // showing nothing — tagged as a softer "relative leader" claim rather than
@@ -1349,19 +1388,19 @@ function renderDailyPicks(rows){
   // once its sector has used up its slot(s), rather than filtering sectors
   // out up front (which could empty the list on a day one sector dominates
   // everything worth flagging).
-  const top3 = [];
+  const topPicks = [];
   const sectorCount = {};
   for (const x of picks) {
-    if (top3.length >= 3) break;
+    if (topPicks.length >= DAILY_PICKS_COUNT) break;
     const sector = x.r.sector || '';
     const used = sector ? (sectorCount[sector] || 0) : 0;
-    if (sector && used >= DAILY_PICKS_SECTOR_CAP) continue;
-    top3.push(x);
+    if (DAILY_PICKS_SECTOR_CAP !== null && sector && used >= DAILY_PICKS_SECTOR_CAP) continue;
+    topPicks.push(x);
     if (sector) sectorCount[sector] = used + 1;
   }
 
   panel.style.display = 'block';
-  if (!top3.length){
+  if (!topPicks.length){
     panel.innerHTML = `<h2>Today's Top Picks</h2><div class="hint">Nothing in the loaded universe clears the bar right now — no picks to flag today.</div>`;
     return;
   }
@@ -1369,9 +1408,9 @@ function renderDailyPicks(rows){
     <h2>Today's Top Picks</h2>
     <div class="hint" style="margin-bottom:10px;">${fallback
       ? `Nothing cleared the usual checklist bar today, so these are today's top percentile-rank names instead (${DAILY_PICKS_ADAPTIVE_FALLBACK_PCT}th pct.+ of the loaded universe) &mdash; a softer, regime-adjusted "best of what's here," not a confirmed setup.`
-      : `Top ${top3.length} by how many of the ${top3[0].gl.total} confirmation pillars are green &mdash; tap a card for full detail.`} No size/market-cap floor &mdash; the best setup wins regardless of cap (shown on each card for your own judgment), at most ${DAILY_PICKS_SECTOR_CAP} per sector, and scans everything loaded regardless of the filters below.</div>
+      : `Top ${topPicks.length} by how many of the ${topPicks[0].gl.total} confirmation pillars are green &mdash; tap a card for full detail. Fewer than ${DAILY_PICKS_COUNT} cards just means fewer than ${DAILY_PICKS_COUNT} names cleared the bar today.`} No size/market-cap floor &mdash; the best setup wins regardless of cap (shown on each card for your own judgment)${DAILY_PICKS_SECTOR_CAP !== null ? `, at most ${DAILY_PICKS_SECTOR_CAP} per sector` : `, no per-sector limit &mdash; the best setups win even if two land in the same sector`}, and scans everything loaded regardless of the filters below.</div>
     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:12px;">
-      ${top3.map(({r,gl,pctRank})=>`
+      ${topPicks.map(({r,gl,pctRank})=>`
         <div style="background:var(--panel-raised); border:1px solid var(--line); border-radius:4px; padding:12px 14px; cursor:pointer;" onclick="openDetail('${r.sym}')">
           <div style="display:flex; justify-content:space-between; align-items:baseline;">
             <span style="font-family:var(--serif); font-weight:700; font-size:16px;">${r.sym}</span>

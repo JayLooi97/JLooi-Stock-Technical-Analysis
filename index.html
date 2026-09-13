@@ -269,6 +269,26 @@
   .pick-pillars .on { color: var(--up); }
   .pick-pillars .off { color: var(--steel-dim); }
 
+  /* Catalyst note — advisory only, never part of a score. Styled as a quiet
+     footnote on the card rather than a badge, so it reads as context to go
+     check rather than a verdict the tool has reached. */
+  .pick-cat { margin-top:6px; padding-top:5px; border-top:1px solid var(--line);
+              font-size:10px; line-height:1.4; color:var(--ink-dim); }
+  .pick-cat .cat-lean { font-family:var(--mono); font-weight:600; text-transform:uppercase;
+                        letter-spacing:0.4px; font-size:9px; }
+  .pick-cat.bearish .cat-lean { color: var(--down); }
+  .pick-cat.bullish .cat-lean { color: var(--up); }
+  .pick-cat.neutral .cat-lean { color: var(--steel); }
+  .pick-cat .cat-meta { color: var(--steel-dim); font-family:var(--mono); font-size:9px; }
+  .pick-cat.quiet { color: var(--steel-dim); }
+  .cat-btn { padding:2px 8px; font-size:11px; font-family:var(--mono); }
+  .cat-more { margin-top:4px; }
+  .cat-more summary { cursor:pointer; color:var(--steel); font-size:9.5px; font-family:var(--mono); list-style:none; }
+  .cat-more summary::-webkit-details-marker { display:none; }
+  .cat-more summary::after { content:' \25BE'; }
+  .cat-more[open] summary::after { content:' \25B4'; }
+  .cat-more-item { margin-top:3px; padding-left:6px; border-left:1px solid var(--line); color:var(--ink-dim); }
+
 </style>
 </head>
 <body>
@@ -518,6 +538,7 @@ function loadSample(){
   ];
   selected = null;
   marketSnapshot = null; // sample data has no real SPY quote behind it
+  catalystState.data = {};
   renderMarketSnapshot();
   render();
 }
@@ -525,6 +546,7 @@ function clearAll(){
   data = [];
   selected = null;
   marketSnapshot = null;
+  catalystState.data = {};
   renderMarketSnapshot();
   render();
 }
@@ -575,6 +597,176 @@ function renderMarketSnapshot(){
     <span class="mkt-read">${read}</span>
     <span class="mkt-detail" title="SPY ${fmt(price,2)} vs prior close ${fmt(prev_close,2)}. Delayed quote, refreshed hourly by the backend — as of ${new Date(as_of).toLocaleString()}.">SPY ${fmt(price,2)} / prev ${fmt(prev_close,2)}</span>
   `;
+}
+
+// Shared status line (the panel fetchAllLive already uses). Kept in one place
+// so the news check and the live fetch can't drift apart on styling.
+function setStatus(msg, isError){
+  const panel = document.getElementById('liveStatusPanel');
+  const line = document.getElementById('liveStatus');
+  if (!panel || !line) return;
+  panel.style.display = 'block';
+  line.textContent = msg;
+  line.style.color = isError ? 'var(--down)' : '';
+}
+
+// --- Catalyst check -------------------------------------------------------
+// Asks the backend to search recent news for the current Top Picks. This is
+// the ONLY non-deterministic thing in the tool, and it is fenced off from
+// everything else on purpose: the result is rendered as a footnote on the
+// card and is never read by any scoring, ranking, filtering or alert code.
+// If this feature is removed entirely, every number the screener produces is
+// unchanged. Keep it that way — the whole engine is testable precisely
+// because no model output can reach it.
+const CATALYST_LOOKBACK_DAYS = 3;
+let catalystState = { loading: false, data: {}, checkedAt: null, error: null, lookbackDays: CATALYST_LOOKBACK_DAYS };
+
+// Model output is untrusted input like any other. The backend scrubs angle
+// brackets too, but this must not depend on that: a proxy change, a cached
+// entry written by an older build, or simply pointing at a different backend
+// would otherwise put raw markup straight into innerHTML.
+function escHtml(v){
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function catalystLine(sym){
+  const c = catalystState.data[sym];
+  if (!c) return '';
+
+  if (!c.found){
+    return `<div class="pick-cat quiet" title="Searched the last ${catalystState.lookbackDays} days and found no company-specific news. Absence of news is not the same as absence of risk — the search can miss things.">&#9675; no recent news found</div>`;
+  }
+
+  const leanLabel = { bullish:'bullish', bearish:'bearish', neutral:'mixed' }[c.lean] || 'mixed';
+  const leanClass = ['bullish','bearish','neutral'].includes(c.lean) ? c.lean : 'neutral';
+  const conf = c.confidence === 'high' ? '' : ` (${escHtml(c.confidence)} confidence)`;
+  const when = c.date ? ` &middot; ${escHtml(c.date)}` : '';
+  const why = c.why ? ` &mdash; ${escHtml(c.why)}` : '';
+
+  // Extra headlines from the same window, folded away. One headline can be
+  // misleading on its own — three together usually make the story obvious
+  // even when the automatic lean gets it wrong.
+  const others = Array.isArray(c.others) ? c.others.filter(o => o && o.title) : [];
+  const moreBlock = others.length
+    ? `<details class="cat-more"><summary>+${others.length} more headline${others.length>1?'s':''}</summary>${
+        others.map(o => `<div class="cat-more-item">${escHtml(o.title)}<span class="cat-meta">${o.date ? ' &middot; ' + escHtml(o.date) : ''}${o.publisher ? ' &middot; ' + escHtml(o.publisher) : ''}</span></div>`).join('')
+      }</details>`
+    : '';
+
+  return `<div class="pick-cat ${leanClass}" title="Automated read of recent headlines, not a recommendation. Check the story before acting on it.">
+    <span class="cat-lean">${leanLabel}${conf}</span><span class="cat-meta">${when}</span><br>
+    ${escHtml(c.headline)}${why}
+    ${moreBlock}
+  </div>`;
+}
+
+// Builds a ready-to-paste brief: the headlines, plus the context an outside
+// model has no way to know (how far the name is off its high, which band, and
+// how the screen scored it). Without that context the answer is just a news
+// summary; with it you get an answer to the question you actually have.
+function copyCatalystBrief(){
+  const lines = [];
+  const syms = [...document.querySelectorAll('#dailyPicksPanel .pick-sym')].map(el => el.textContent.trim());
+
+  syms.forEach(sym => {
+    const c = catalystState.data[sym];
+    const row = data.find(r => String(r.sym).toUpperCase() === sym.toUpperCase());
+    const comp = row ? computeRow(row) : null;
+
+    const bits = [sym];
+    if (comp){
+      if (comp.currentDrawdownPct != null) bits.push(`down ${fmt(comp.currentDrawdownPct,1)}% from its 6-month high`);
+      if (comp.setupQualityScore != null) bits.push(`setup quality ${fmt(comp.setupQualityScore,0)}/100`);
+    }
+    lines.push(bits.join(' — '));
+
+    if (!c || !c.found){
+      lines.push('  (no headlines found in the last ' + catalystState.lookbackDays + ' days)');
+    } else {
+      const all = [{ title: c.headline, date: c.date, publisher: '' }].concat(Array.isArray(c.others) ? c.others : []);
+      all.forEach(h => {
+        if (!h || !h.title) return;
+        const meta = [h.date, h.publisher].filter(Boolean).join(', ');
+        lines.push('  - ' + h.title + (meta ? ` (${meta})` : ''));
+      });
+    }
+    lines.push('');
+  });
+
+  const brief =
+    `I use a technical screener that finds stocks in a pullback showing signs of turning back up. ` +
+    `It has no idea WHY a stock fell, which is the gap I want you to fill.\n\n` +
+    `For each name below, tell me whether the drawdown looks like ordinary sector or market weakness, ` +
+    `or something company-specific I should be wary of. Flag anything that looks like a falling knife. ` +
+    `Say so plainly if the headlines are too thin to judge.\n\n` +
+    lines.join('\n');
+
+  copyToClipboard_(brief, `Copied ${syms.length} name${syms.length>1?'s':''} — paste into Claude or ChatGPT.`);
+}
+
+// navigator.clipboard needs a secure context. GitHub Pages is https so it
+// works there, but the Apps Script iframe and any local file:// testing can
+// fail, hence the textarea fallback.
+function copyToClipboard_(text, okMsg){
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:-1000px;left:-1000px;opacity:0;';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    ta.remove();
+    setStatus(ok ? okMsg : 'Could not copy automatically — your browser blocked it.', !ok);
+  };
+  if (navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(() => setStatus(okMsg)).catch(fallback);
+  } else {
+    fallback();
+  }
+}
+
+async function checkCatalysts(){
+  if (catalystState.loading) return;
+
+  const url = (document.getElementById('backendUrl').value || '').trim();
+  if (!url){ setStatus('Add your Apps Script URL first — the news check runs through your backend, not the browser.', true); return; }
+
+  // Only ask about what's actually on screen. The picks are recomputed on
+  // every render, so read them from the DOM rather than duplicating the
+  // selection logic here and risking the two drifting apart.
+  const syms = [...document.querySelectorAll('#dailyPicksPanel .pick-sym')].map(el => el.textContent.trim());
+  if (!syms.length){ setStatus('No Top Picks on screen to check.', true); return; }
+
+  catalystState.loading = true;
+  catalystState.error = null;
+  render();
+  setStatus(`Searching the last ${CATALYST_LOOKBACK_DAYS} days of news for ${syms.length} name${syms.length>1?'s':''}\u2026`);
+
+  try {
+    const q = url + (url.includes('?') ? '&' : '?') + 'action=catalyst&symbols=' + encodeURIComponent(syms.join(','));
+    const json = await jsonpFetch(q, 150000);
+
+    if (json.error){
+      catalystState.error = json.error;
+      setStatus('News check: ' + json.error, true);
+    } else {
+      catalystState.data = json.catalysts || {};
+      catalystState.checkedAt = json.checked_at || new Date().toISOString();
+      catalystState.lookbackDays = json.lookback_days || CATALYST_LOOKBACK_DAYS;
+      const hits = syms.filter(sym => catalystState.data[sym] && catalystState.data[sym].found).length;
+      const src = json.source ? ` via ${json.source}` : '';
+      setStatus(`News check complete${src}: ${hits} of ${syms.length} have headlines in the last ${catalystState.lookbackDays} days${json.cached ? ' (cached)' : ''}. Advisory only — scores and ranking are unchanged.`);
+    }
+  } catch (err) {
+    catalystState.error = err.message;
+    setStatus('News check failed: ' + err.message, true);
+  } finally {
+    catalystState.loading = false;
+    render();
+  }
 }
 
 function num(v){ const n = parseFloat(v); return isNaN(n) ? null : n; }
@@ -677,12 +869,9 @@ document.getElementById('backendUrl').addEventListener('input', function(){
 
 async function fetchAllLive(){
   const btn = document.getElementById('liveBtn');
-  const statusPanel = document.getElementById('liveStatusPanel');
-  const status = document.getElementById('liveStatus');
   const url = document.getElementById('backendUrl').value.trim();
-  statusPanel.style.display = 'block';
   btn.disabled = true;
-  status.textContent = 'Contacting backend… (a large screen can take up to a minute — please wait)';
+  setStatus('Contacting backend… (a large screen can take up to a minute — please wait)');
 
   try {
     const json = await jsonpFetch(url, 90000);
@@ -773,9 +962,9 @@ async function fetchAllLive(){
       msg += ` ⚠️ ${json.sheet_errors.join(' ')}`;
     }
 
-    status.textContent = msg;
+    setStatus(msg);
   } catch (e){
-    status.textContent = `Fetch failed: ${e.message}. Is your Apps Script URL correct and deployed with "Anyone" access?`;
+    setStatus(`Fetch failed: ${e.message}. Is your Apps Script URL correct and deployed with "Anyone" access?`, true);
   } finally {
     btn.disabled = false;
   }
@@ -1831,6 +2020,8 @@ function renderDailyPicks(rows){
     <div class="picks-head">
       <h2>Today's Top Picks</h2>
       <details class="picks-why"><summary>${fallback ? 'soft day &mdash; why' : `top ${topPicks.length} by pillars`}</summary><p>${why}${whyMore}</p></details>
+      <button class="cat-btn" id="catBtn" onclick="checkCatalysts()" title="Fetch the last ${CATALYST_LOOKBACK_DAYS} days of headlines for these names. Advisory context only — it never changes any score or the ranking.">${catalystState.loading ? 'Checking&hellip;' : 'Check news'}</button>
+      ${Object.keys(catalystState.data).length ? `<button class="cat-btn" id="catCopyBtn" onclick="copyCatalystBrief()" title="Copy every headline found, with the drawdown context, formatted as a question you can paste straight into Claude or ChatGPT.">Copy for AI</button>` : ''}
     </div>
     <div class="picks-grid">
       ${topPicks.map(({r,gl,pctRank})=>`
@@ -1843,6 +2034,7 @@ function renderDailyPicks(rows){
           <div class="pick-pillars">
             ${gl.items.map(i=>`<span class="${i.pass?'on':'off'}" title="${i.label}">${i.pass?'&#9679;':'&#9675;'} ${i.label}</span>`).join('')}
           </div>
+          ${catalystLine(r.sym)}
         </div>
       `).join('')}
     </div>

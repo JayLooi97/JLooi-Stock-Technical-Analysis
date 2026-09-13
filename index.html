@@ -288,6 +288,9 @@
   .cat-more summary::after { content:' \25BE'; }
   .cat-more[open] summary::after { content:' \25B4'; }
   .cat-more-item { margin-top:3px; padding-left:6px; border-left:1px solid var(--line); color:var(--ink-dim); }
+  .pick-cat a { color: inherit; text-decoration: underline; text-decoration-style: dotted;
+                text-underline-offset: 2px; text-decoration-color: var(--steel); }
+  .pick-cat a:hover { color: var(--teal); text-decoration-color: var(--teal); }
 
 </style>
 </head>
@@ -621,6 +624,17 @@ function setStatus(msg, isError){
 const CATALYST_LOOKBACK_DAYS = 3;
 let catalystState = { loading: false, data: {}, checkedAt: null, error: null, lookbackDays: CATALYST_LOOKBACK_DAYS };
 
+// Renders a headline, as a link when there's a safe URL for it. The scheme
+// and host are re-checked here even though the backend already whitelisted
+// them: a javascript: or data: URL in an href is the classic way this kind
+// of feature gets turned into an XSS hole, and the frontend must not depend
+// on an upstream check it can't see.
+function newsLink(title, link){
+  const safe = typeof link === 'string' && /^https:\/\/news\.google\.com\//.test(link);
+  if (!safe) return escHtml(title);
+  return `<a href="${escHtml(link)}" target="_blank" rel="noopener noreferrer nofollow" onclick="event.stopPropagation();">${escHtml(title)}</a>`;
+}
+
 // Model output is untrusted input like any other. The backend scrubs angle
 // brackets too, but this must not depend on that: a proxy change, a cached
 // entry written by an older build, or simply pointing at a different backend
@@ -650,14 +664,14 @@ function catalystLine(sym){
   // even when the automatic lean gets it wrong.
   const others = Array.isArray(c.others) ? c.others.filter(o => o && o.title) : [];
   const moreBlock = others.length
-    ? `<details class="cat-more"><summary>+${others.length} more headline${others.length>1?'s':''}</summary>${
-        others.map(o => `<div class="cat-more-item">${escHtml(o.title)}<span class="cat-meta">${o.date ? ' &middot; ' + escHtml(o.date) : ''}${o.publisher ? ' &middot; ' + escHtml(o.publisher) : ''}</span></div>`).join('')
+    ? `<details class="cat-more" onclick="event.stopPropagation();"><summary>+${others.length} more headline${others.length>1?'s':''}</summary>${
+        others.map(o => `<div class="cat-more-item">${newsLink(o.title, o.link)}<span class="cat-meta">${o.date ? ' &middot; ' + escHtml(o.date) : ''}${o.publisher ? ' &middot; ' + escHtml(o.publisher) : ''}</span></div>`).join('')
       }</details>`
     : '';
 
   return `<div class="pick-cat ${leanClass}" title="Automated read of recent headlines, not a recommendation. Check the story before acting on it.">
     <span class="cat-lean">${leanLabel}${conf}</span><span class="cat-meta">${when}</span><br>
-    ${escHtml(c.headline)}${why}
+    ${newsLink(c.headline, c.link)}${why}
     ${moreBlock}
   </div>`;
 }

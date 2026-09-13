@@ -213,6 +213,21 @@
   /* Buy-zone alerts as a single ticker-tape row rather than a stacked panel.
      It only scrolls when the content is actually wider than the strip, and it
      pauses on hover/tap so a name can be read and clicked while it moves. */
+  /* SPY gap read — a quick "which way is the wind blowing" before the US
+     open. Left border carries the color so it reads at a glance without
+     parsing the text; the text itself stays hedged (see renderMarketSnapshot). */
+  #marketPanel { display:flex; align-items:center; gap:10px; padding:8px 12px;
+    border-left:3px solid var(--steel-dim); flex-wrap:wrap; }
+  #marketPanel.mkt-bull { border-left-color: var(--up); }
+  #marketPanel.mkt-bear { border-left-color: var(--down); }
+  #marketPanel.mkt-flat { border-left-color: var(--steel); }
+  .mkt-label { font-family:var(--mono); font-size:10px; letter-spacing:0.6px; text-transform:uppercase;
+               color:var(--ink-dim); white-space:nowrap; }
+  .mkt-gap { font-family:var(--serif); font-weight:700; font-size:15px; }
+  .mkt-gap.up { color: var(--up); } .mkt-gap.down { color: var(--down); }
+  .mkt-read { font-size:12.5px; color:var(--ink-dim); }
+  .mkt-detail { font-family:var(--mono); font-size:11px; color:var(--steel); margin-left:auto; white-space:nowrap; }
+
   #alertPanel.tape-panel { display:flex; align-items:center; gap:6px; padding:7px 8px; margin-bottom:14px; }
   .tape-label { flex:0 0 auto; font-family:var(--mono); font-size:10px; letter-spacing:0.6px;
                 text-transform:uppercase; color:var(--teal); white-space:nowrap; }
@@ -273,6 +288,8 @@
     </div>
     <div class="stamp" id="stamp"></div>
   </header>
+
+  <div class="panel" id="marketPanel" style="display:none;"></div>
 
   <div class="panel" id="installBanner" style="display:none; padding:10px 16px; align-items:center; justify-content:space-between; gap:12px;">
     <span id="installBannerText" style="font-size:13px; color:var(--ink-dim);"></span>
@@ -500,13 +517,66 @@ function loadSample(){
     {sym:'PYPL', sector:'Payments', price:64.00, high:98.50, low:58.20, swing:58.20, trend:'flat', vol:'falling', longTermTrend:'below_both', weeklyTrend:'down', relStrengthPct:-9.4},
   ];
   selected = null;
+  marketSnapshot = null; // sample data has no real SPY quote behind it
+  renderMarketSnapshot();
   render();
 }
 function clearAll(){
   data = [];
   selected = null;
+  marketSnapshot = null;
+  renderMarketSnapshot();
   render();
 }
+// --- SPY premarket / market-regime read -----------------------------------
+// market_snapshot comes from a live backend fetch only (see fetchAllLive) —
+// sample data and manual rows have no real SPY quote behind them, so the
+// panel is hidden rather than showing a stale or invented reading.
+let marketSnapshot = null;
+
+const MARKET_GAP_THRESHOLD_PCT = 0.15; // below this magnitude reads as flat/mixed
+
+function renderMarketSnapshot(){
+  const panel = document.getElementById('marketPanel');
+  if (!marketSnapshot || marketSnapshot.gap_pct == null){
+    panel.style.display = 'none';
+    return;
+  }
+  const { gap_pct, price, prev_close, phase, as_of } = marketSnapshot;
+  const dir = gap_pct > MARKET_GAP_THRESHOLD_PCT ? 'bull' : gap_pct < -MARKET_GAP_THRESHOLD_PCT ? 'bear' : 'flat';
+  const arrow = dir === 'bull' ? '▲' : dir === 'bear' ? '▼' : '—';
+  const cls = dir === 'bull' ? 'up' : dir === 'bear' ? 'down' : '';
+
+  const phaseLabel = {
+    premarket: 'Pre-market',
+    regular_session: 'Regular session (in progress)',
+    after_close: "Today's close"
+  }[phase] || 'Latest quote';
+
+  const bias = {
+    bull: 'leaning bullish',
+    bear: 'leaning bearish',
+    flat: 'roughly flat'
+  }[dir];
+
+  // Deliberately hedged wording: this is one index's gap, not a forecast.
+  // "in progress"/"today's close" get a different verb since "vs open" no
+  // longer describes what's happening once the session is running or done.
+  const verb = phase === 'premarket' ? 'indicating' : phase === 'regular_session' ? 'trading' : 'finished';
+  const read = phase === 'after_close'
+    ? `SPY ${verb} the day ${bias} vs the prior close &mdash; one data point, not a signal on its own.`
+    : `SPY ${verb} ${bias} vs the prior close.`;
+
+  panel.className = `panel mkt-${dir}`;
+  panel.style.display = 'flex';
+  panel.innerHTML = `
+    <span class="mkt-label">${phaseLabel}</span>
+    <span class="mkt-gap ${cls}">${arrow} ${gap_pct > 0 ? '+' : ''}${gap_pct.toFixed(2)}%</span>
+    <span class="mkt-read">${read}</span>
+    <span class="mkt-detail" title="SPY ${fmt(price,2)} vs prior close ${fmt(prev_close,2)}. Delayed quote, refreshed hourly by the backend — as of ${new Date(as_of).toLocaleString()}.">SPY ${fmt(price,2)} / prev ${fmt(prev_close,2)}</span>
+  `;
+}
+
 function num(v){ const n = parseFloat(v); return isNaN(n) ? null : n; }
 
 // Buckets: micro <$300M, small $300M-$2B, mid $2B-$10B, large $10B-$200B,
@@ -682,6 +752,8 @@ async function fetchAllLive(){
       reversalComponent: r.reversalComponent ?? null,
       geometryComponent: r.geometryComponent ?? null,
     }));
+    marketSnapshot = json.market_snapshot || null;
+    renderMarketSnapshot();
     render();
 
     let msg = `Live fetch complete: ${json.count_ok} symbols screened`;

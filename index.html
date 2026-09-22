@@ -292,6 +292,50 @@
                 text-underline-offset: 2px; text-decoration-color: var(--steel); }
   .pick-cat a:hover { color: var(--teal); text-decoration-color: var(--teal); }
 
+  /* ---- Signal chart (Signal Desk) ---- */
+  #signalPanel .sig-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:6px; }
+  #signalPanel .sig-head h2 { margin:0; }
+  #signalPanel .sig-px { font-family:var(--serif); font-weight:700; font-size:32px; line-height:1; }
+  #signalPanel .sig-chg { font-family:var(--mono); font-size:14px; }
+  #signalPanel .sig-close { margin-left:auto; }
+  #signalPanel .sig-up { color:var(--up); } #signalPanel .sig-down { color:var(--down); }
+  #signalPanel .sig-verdict { margin:10px 0 14px; }
+  #signalPanel .sig-word { font-family:var(--serif); font-weight:700; font-size:22px; }
+  #signalPanel .sig-meter { position:relative; height:8px; border-radius:4px; margin:8px 0 4px; max-width:520px;
+    background:linear-gradient(90deg, var(--down), #6b5a4a 42%, #4a5a5e 58%, var(--up)); }
+  #signalPanel .sig-meter i { position:absolute; top:-5px; width:4px; height:18px; background:var(--ink); border-radius:2px;
+    transform:translateX(-50%); transition:left .5s ease; }
+  #signalPanel .sig-ends { display:flex; justify-content:space-between; max-width:520px; color:var(--ink-dim); font-size:12px; }
+  #signalPanel .sig-trend { color:var(--ink-dim); font-size:14px; margin-top:4px; }
+  #signalPanel .sig-toggles { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
+  #signalPanel .sig-toggles label { font-size:13px; color:var(--ink-dim); border:1px solid var(--line); border-radius:3px;
+    padding:3px 8px; cursor:pointer; user-select:none; }
+  #signalPanel .sig-toggles input { accent-color:var(--brass); margin:0 4px 0 0; vertical-align:-2px; }
+  #signalPanel .sig-pane { position:relative; border:1px solid var(--line); border-radius:3px; overflow:hidden; background:var(--midnight); }
+  #signalPanel .sig-pane + .sig-pane { margin-top:6px; }
+  #signalPanel .sig-tag { position:absolute; left:10px; top:6px; z-index:3; font-family:var(--mono); font-size:11px;
+    color:var(--ink-dim); pointer-events:none; }
+  #signalPanel .sig-tag b { font-weight:600; margin-right:8px; }
+  #sigMain { height:360px; } #sigMacd, #sigAdx { height:120px; }
+  #sigOverlay { position:absolute; inset:0; pointer-events:none; z-index:2; }
+  #signalPanel h3 { font-family:var(--serif); font-size:18px; margin:22px 0 10px; }
+  #signalPanel .sig-alert { background:var(--panel-raised); border-radius:3px; padding:10px 14px; margin-bottom:8px;
+    border-left:4px solid var(--grey); }
+  #signalPanel .sig-alert.bull { border-left-color:var(--up); } #signalPanel .sig-alert.bear { border-left-color:var(--down); }
+  #signalPanel .sig-alert .hd { display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
+  #signalPanel .sig-alert .nm { font-weight:600; }
+  #signalPanel .sig-alert .nm span { color:var(--ink-dim); font-weight:400; margin-left:6px; font-size:14px; }
+  #signalPanel .sig-alert .sc { font-family:var(--mono); font-weight:600; font-size:18px; white-space:nowrap; }
+  #signalPanel .sig-alert .sc small { color:var(--ink-dim); font-size:12px; font-weight:400; }
+  #signalPanel .sig-alert dl { margin:6px 0 0; display:grid; grid-template-columns:auto 1fr; gap:2px 10px; font-size:14px; }
+  #signalPanel .sig-alert dt { color:var(--ink-dim); } #signalPanel .sig-alert dd { margin:0; }
+  #signalPanel .sig-levels { width:100%; border-collapse:collapse; font-size:14px; }
+  #signalPanel .sig-levels td { padding:7px 4px; border-bottom:1px solid var(--line); }
+  #signalPanel .sig-levels td:last-child { text-align:right; font-family:var(--mono); }
+  #signalPanel .sig-sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:8px; }
+  #signalPanel .sig-status { color:var(--ink-dim); padding:18px 0; }
+  #signalPanel .sig-status.err { color:var(--down); }
+  #signalPanel .sig-foot { color:var(--ink-dim); font-size:12px; margin-top:18px; }
 </style>
 </head>
 <body>
@@ -383,6 +427,7 @@
       <input type="text" id="searchTicker" class="cell" style="width:120px;" placeholder="Search ticker&hellip;" onkeydown="if(event.key==='Enter')searchTicker()">
       <button onclick="searchTicker()">Search</button>
     </span>
+    <button onclick="openSignal(document.getElementById('searchTicker').value)" title="Chart with trendlines, support/resistance, MACD/ADX and money-flow alerts for the ticker in the search box. Works for any ticker, even ones not in the screener">Signal chart</button>
     <button onclick="clearSearch()" id="clearSearchBtn" style="display:none;">&times; Clear search</button>
     <select id="colMode" onchange="applyColumnMode()" title="Key columns only keeps the screen readable on a phone; switch to all columns for the full picture">
       <option value="key">Columns: key only</option>
@@ -438,6 +483,8 @@
   </div>
 
   <div class="panel" id="detailPanel" style="display:none;"></div>
+
+  <div class="panel" id="signalPanel" style="display:none;"></div>
 
   <details class="panel method">
     <summary>How to read this</summary>
@@ -2202,7 +2249,7 @@ function openDetail(sym, silent){
   const priceNum = num(r.price);
   const inZoneNow = priceNum!==null && c.buyZones.some(z => priceNum>=z.low && priceNum<=z.high);
   panel.innerHTML = `
-    <h2>${r.sym} &mdash; ${r.sector}</h2>
+    <h2>${r.sym} &mdash; ${r.sector} <button onclick="openSignal('${r.sym}')" style="font-size:13px; vertical-align:middle; margin-left:8px;">Signal chart</button></h2>
     <div style="display:flex; align-items:baseline; gap:14px; margin:-2px 0 14px; flex-wrap:wrap;">
       <div style="font-family:var(--serif); font-weight:700; font-size:42px; line-height:1; color:${inZoneNow?'var(--up)':'var(--ink)'};">${priceNum!==null?fmt(priceNum,2):'&mdash;'}</div>
       <div class="hint" style="font-size:13px;">
@@ -2372,6 +2419,304 @@ window.addEventListener('beforeinstallprompt', function(e){
 // Share-sheet action, so just point people at it once per session.
 if (isIOS() && !isStandalone) {
   showInstallBanner('On iPhone/iPad: tap Share, then "Add to Home Screen" for quicker access.', false);
+}
+
+// ===========================================================================
+// SIGNAL CHART (Signal Desk) — one ticker's chart with trendlines, support /
+// resistance boxes, fair-value gaps, B/S markers, MACD + ADX panes and scored
+// money-flow alerts. Data comes from the backend's ?action=signal endpoint
+// (see the SIGNAL DESK section of Code.gs). Opened from the "Signal chart"
+// button next to Search, or from any row's detail panel.
+// ===========================================================================
+const SIG = {
+  lib: 'https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js',
+  C: { up:'#4CAF7D', down:'#D9564A', gold:'#D9A441', cyan:'#82CFFF', violet:'#9C8FD9', ink:'#F5F7FB', dim:'#B7C1D6',
+       line:'#33406B', bg:'#0A0E1C', ema10:'#F06F8A', ema20:'#D9A441', ema50:'#4A8FE8', sma200:'#F5F7FB' },
+  data: null, charts: [], series: {}, drawQueued: false, busy: false,
+  layers: { ma:true, tl:true, zone:true, fvg:true, mk:true }
+};
+const sigEl = id => document.getElementById(id);
+const sigFmt = v => v == null ? '\u2014' : Number(v).toFixed(2);
+const sigEsc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function sigLoadLib(){
+  if (window.LightweightCharts) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = SIG.lib;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('could not load the chart library — check your internet connection'));
+    document.head.appendChild(s);
+  });
+}
+
+function closeSignal(){
+  SIG.charts.forEach(c => c.remove()); SIG.charts = []; SIG.series = {};
+  sigEl('signalPanel').style.display = 'none';
+}
+
+async function openSignal(sym){
+  sym = String(sym || '').trim().toUpperCase();
+  if (!sym){ setStatus('Type a ticker in the search box, then tap Signal chart.', true); return; }
+  const url = (document.getElementById('backendUrl').value || '').trim();
+  if (!url){ setStatus('Add your Apps Script URL first — the signal chart runs through your backend.', true); return; }
+  if (SIG.busy) return;
+  SIG.busy = true;
+  const panel = sigEl('signalPanel');
+  SIG.charts.forEach(c => c.remove()); SIG.charts = []; SIG.series = {};
+  panel.style.display = 'block';
+  panel.innerHTML = `<div class="sig-head"><h2>${sigEsc(sym)} &mdash; Signal chart</h2>
+    <button class="sig-close" onclick="closeSignal()">&times; Close</button></div>
+    <div class="sig-status" id="sigStatus">Analysing ${sigEsc(sym)}&hellip; this takes about 5&ndash;10 seconds.</div>`;
+  panel.scrollIntoView({ behavior:'smooth', block:'start' });
+  try {
+    await sigLoadLib();
+    const q = url + (url.includes('?') ? '&' : '?') + 'action=signal&symbol=' + encodeURIComponent(sym);
+    const json = await jsonpFetch(q, 60000);
+    if (json.error) throw new Error(json.error);
+    if (!json.bars) throw new Error('your backend doesn\u2019t have the signal feature yet. Paste in the new Code.gs and redeploy it as a new version.');
+    SIG.data = json;
+    sigRender();
+  } catch (err) {
+    const st = sigEl('sigStatus');
+    if (st){ st.className = 'sig-status err'; st.textContent = 'Signal chart failed: ' + err.message; }
+  } finally {
+    SIG.busy = false;
+  }
+}
+
+function sigRender(){
+  const d = SIG.data, s = d.summary;
+  const up = s.change >= 0, sign = up ? '+' : '';
+  sigEl('signalPanel').innerHTML = `
+    <div class="sig-head">
+      <h2>${sigEsc(d.ticker)}</h2>
+      <span class="sig-px">${sigFmt(s.price)}</span>
+      <span class="sig-chg ${up ? 'sig-up' : 'sig-down'}">${sign}${sigFmt(s.change)} (${sign}${sigFmt(s.changePct)}%)</span>
+      <span class="hint">Daily &middot; ${sigEsc(d.asOf)}</span>
+      <button class="sig-close" onclick="closeSignal()">&times; Close</button>
+    </div>
+    <div class="sig-verdict">
+      <div class="sig-word ${s.net >= 15 ? 'sig-up' : s.net <= -15 ? 'sig-down' : ''}">${sigEsc(s.bias)}</div>
+      <div class="sig-meter"><i style="left:${(s.net + 100) / 2}%"></i></div>
+      <div class="sig-ends"><span>Bearish</span><span>Neutral</span><span>Bullish</span></div>
+      <div class="sig-trend">${sigEsc(s.trend)}</div>
+    </div>
+    <div class="sig-toggles">
+      <label><input type="checkbox" data-sig="ma" ${SIG.layers.ma ? 'checked' : ''}>Averages</label>
+      <label><input type="checkbox" data-sig="tl" ${SIG.layers.tl ? 'checked' : ''}>Trendlines</label>
+      <label><input type="checkbox" data-sig="zone" ${SIG.layers.zone ? 'checked' : ''}>Zones</label>
+      <label><input type="checkbox" data-sig="fvg" ${SIG.layers.fvg ? 'checked' : ''}>Gaps (FVG)</label>
+      <label><input type="checkbox" data-sig="mk" ${SIG.layers.mk ? 'checked' : ''}>B/S signals</label>
+    </div>
+    <div class="sig-pane" id="sigMainPane"><div class="sig-tag" id="sigMaTag"></div><div id="sigMain"></div><canvas id="sigOverlay"></canvas></div>
+    <div class="sig-pane"><div class="sig-tag" id="sigMacdTag"></div><div id="sigMacd"></div></div>
+    <div class="sig-pane"><div class="sig-tag" id="sigAdxTag"></div><div id="sigAdx"></div></div>
+    <h3>Alerts</h3><div id="sigAlerts"></div>
+    <h3>Key levels</h3><table class="sig-levels" id="sigLevels"></table>
+    <p class="sig-foot">Daily data from Google Finance, about 20 minutes delayed. Money flow is estimated from price and volume (MFI, CMF, OBV), not broker order flow. Scores are rule-of-thumb weightings, not tested win rates. Not financial advice.</p>`;
+  document.querySelectorAll('#signalPanel [data-sig]').forEach(el => el.addEventListener('change', () => {
+    SIG.layers[el.dataset.sig] = el.checked; sigApplyLayers();
+  }));
+  sigBuildCharts();
+  sigRenderAlerts();
+  sigRenderLevels();
+}
+
+function sigBaseOpts(el){
+  return {
+    width: el.clientWidth, height: el.clientHeight,
+    layout: { background: { type:'solid', color: SIG.C.bg }, textColor: SIG.C.dim, fontFamily: 'IBM Plex Mono, monospace', fontSize: 11 },
+    grid: { vertLines: { color:'rgba(51,64,107,.45)' }, horzLines: { color:'rgba(51,64,107,.45)' } },
+    rightPriceScale: { borderColor: SIG.C.line, minimumWidth: 62 },
+    timeScale: { borderColor: SIG.C.line, rightOffset: 2, barSpacing: 7 },
+    crosshair: { mode: 0 },
+    handleScale: { axisPressedMouseMove: { time:true, price:false } }
+  };
+}
+
+function sigLineData(arr){
+  const d = SIG.data;
+  const out = d.bars.map((b, i) => arr[i] == null ? { time:b.t } : { time:b.t, value:arr[i] });
+  d.futureDates.forEach(t => out.push({ time:t }));
+  return out;
+}
+
+function sigBuildCharts(){
+  const d = SIG.data, C = SIG.C, LC = window.LightweightCharts;
+  const mainEl = sigEl('sigMain'), macdEl = sigEl('sigMacd'), adxEl = sigEl('sigAdx');
+
+  const main = LC.createChart(mainEl, sigBaseOpts(mainEl));
+  const candles = main.addCandlestickSeries({ upColor:C.up, downColor:C.down, borderVisible:false,
+    wickUpColor:C.up, wickDownColor:C.down, priceLineColor:C.gold, priceLineStyle:2 });
+  const cData = d.bars.map(b => ({ time:b.t, open:b.o, high:b.h, low:b.l, close:b.c }));
+  d.futureDates.forEach(t => cData.push({ time:t }));
+  candles.setData(cData);
+  SIG.series.candles = candles;
+
+  const vol = main.addHistogramSeries({ priceScaleId:'vol', priceFormat:{ type:'volume' }, lastValueVisible:false, priceLineVisible:false });
+  main.priceScale('vol').applyOptions({ scaleMargins:{ top:0.82, bottom:0 } });
+  vol.setData(d.bars.map(b => ({ time:b.t, value:b.v, color: b.c >= b.o ? 'rgba(76,175,125,.35)' : 'rgba(217,86,74,.35)' })));
+
+  SIG.series.ma = ['ema10','ema20','ema50','sma200'].map(k => {
+    const s = main.addLineSeries({ color:C[k], lineWidth: k === 'sma200' ? 2 : 1, priceLineVisible:false,
+      lastValueVisible:false, crosshairMarkerVisible:false });
+    s.setData(sigLineData(d.lines[k]));
+    return s;
+  });
+  sigEl('sigMaTag').innerHTML = `<b style="color:${C.ema10}">EMA10</b><b style="color:${C.ema20}">EMA20</b><b style="color:${C.ema50}">EMA50</b><b style="color:${C.sma200}">MA200</b>`;
+
+  SIG.series.tl = [];
+  ['support','resistance'].forEach(k => {
+    const tl = d.trendlines[k];
+    if (!tl) return;
+    const s = main.addLineSeries({ color: k === 'support' ? '#E8D3A8' : '#D9A7A7', lineWidth:2,
+      lineStyle: tl.status === 'broken' ? 2 : 0, priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false });
+    s.setData(tl.points);
+    SIG.series.tl.push(s);
+  });
+
+  const macd = LC.createChart(macdEl, sigBaseOpts(macdEl));
+  const hist = macd.addHistogramSeries({ priceLineVisible:false, lastValueVisible:false });
+  const hData = d.bars.map((b, i) => d.macd.hist[i] == null ? { time:b.t }
+    : { time:b.t, value:d.macd.hist[i], color: d.macd.hist[i] >= 0 ? 'rgba(76,175,125,.8)' : 'rgba(217,86,74,.8)' });
+  d.futureDates.forEach(t => hData.push({ time:t }));
+  hist.setData(hData);
+  macd.addLineSeries({ color:'#F0A04B', lineWidth:1, priceLineVisible:false, lastValueVisible:false }).setData(sigLineData(d.macd.dif));
+  macd.addLineSeries({ color:C.cyan, lineWidth:1, priceLineVisible:false, lastValueVisible:false }).setData(sigLineData(d.macd.dea));
+
+  const adx = LC.createChart(adxEl, sigBaseOpts(adxEl));
+  adx.addLineSeries({ color:'#5AA2FF', lineWidth:1, priceLineVisible:false, lastValueVisible:false }).setData(sigLineData(d.dmi.pdi));
+  adx.addLineSeries({ color:C.gold, lineWidth:1, priceLineVisible:false, lastValueVisible:false }).setData(sigLineData(d.dmi.mdi));
+  const ax = adx.addLineSeries({ color:C.down, lineWidth:2, priceLineVisible:false, lastValueVisible:false });
+  ax.setData(sigLineData(d.dmi.adx));
+  ax.createPriceLine({ price:25, color:'rgba(183,193,214,.5)', lineWidth:1, lineStyle:2, axisLabelVisible:true, title:'' });
+
+  SIG.charts = [main, macd, adx];
+
+  // Legends follow the crosshair
+  const setTags = i => {
+    const m = d.macd, x = d.dmi;
+    sigEl('sigMacdTag').innerHTML = `MACD(12,26,9) <b style="color:#F0A04B">DIF ${sigFmt(m.dif[i])}</b><b style="color:${C.cyan}">DEA ${sigFmt(m.dea[i])}</b><b style="color:${C.ink}">MACD ${sigFmt(m.hist[i])}</b>`;
+    sigEl('sigAdxTag').innerHTML = `<b style="color:#5AA2FF">+DI ${sigFmt(x.pdi[i])}</b><b style="color:${C.gold}">&minus;DI ${sigFmt(x.mdi[i])}</b><b style="color:${C.down}">ADX ${sigFmt(x.adx[i])}</b>`;
+  };
+  const lastIdx = d.bars.length - 1;
+  setTags(lastIdx);
+  const idxOf = {}; d.bars.forEach((b, i) => idxOf[b.t] = i);
+  const toISO = t => typeof t === 'string' ? t : t.year + '-' + String(t.month).padStart(2,'0') + '-' + String(t.day).padStart(2,'0');
+  SIG.charts.forEach(ch => ch.subscribeCrosshairMove(p => {
+    const i = p && p.time ? idxOf[toISO(p.time)] : undefined;
+    setTags(i == null ? lastIdx : i);
+    if (ch === main) sigScheduleDraw();
+  }));
+
+  // Keep the three panes scrolled together
+  let syncing = false;
+  SIG.charts.forEach(src => src.timeScale().subscribeVisibleLogicalRangeChange(r => {
+    if (syncing || !r) return;
+    syncing = true;
+    SIG.charts.forEach(dst => { if (dst !== src) dst.timeScale().setVisibleLogicalRange(r); });
+    syncing = false;
+    sigScheduleDraw();
+  }));
+  const n = d.bars.length + d.futureDates.length;
+  main.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 130), to: n });
+
+  sigApplyLayers();
+}
+
+window.addEventListener('resize', () => {
+  if (!SIG.charts.length) return;
+  ['sigMain','sigMacd','sigAdx'].forEach((id, k) => {
+    const el = sigEl(id);
+    if (el && SIG.charts[k]) SIG.charts[k].applyOptions({ width: el.clientWidth });
+  });
+  sigScheduleDraw();
+});
+
+function sigApplyLayers(){
+  if (!SIG.series.candles) return;
+  SIG.series.ma.forEach(s => s.applyOptions({ visible: SIG.layers.ma }));
+  SIG.series.tl.forEach(s => s.applyOptions({ visible: SIG.layers.tl }));
+  SIG.series.candles.setMarkers(SIG.layers.mk ? SIG.data.markers.map(m => ({
+    time:m.time, position:m.position, shape:m.shape, text:m.text, color: m.kind === 'buy' ? SIG.C.up : SIG.C.down
+  })) : []);
+  sigScheduleDraw();
+}
+
+function sigScheduleDraw(){
+  if (SIG.drawQueued) return;
+  SIG.drawQueued = true;
+  requestAnimationFrame(() => { SIG.drawQueued = false; sigDrawBoxes(); });
+}
+
+// Zone and gap boxes drawn on a canvas laid over the main chart
+function sigDrawBoxes(){
+  const cv = sigEl('sigOverlay'), main = SIG.charts[0], candles = SIG.series.candles;
+  if (!cv || !main || !candles) return;
+  const pane = sigEl('sigMainPane'), dpr = window.devicePixelRatio || 1;
+  const w = pane.clientWidth, h = sigEl('sigMain').clientHeight;
+  cv.width = w * dpr; cv.height = h * dpr; cv.style.width = w + 'px'; cv.style.height = h + 'px';
+  const g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  const plotW = main.timeScale().width(), plotH = h - 28;
+  g.save(); g.beginPath(); g.rect(0, 0, plotW, plotH); g.clip();
+
+  const box = (fromT, top, bottom, fill, stroke, label) => {
+    const y1 = candles.priceToCoordinate(top), y2 = candles.priceToCoordinate(bottom);
+    if (y1 == null || y2 == null) return;
+    let x = main.timeScale().timeToCoordinate(fromT);
+    if (x == null) x = 0;
+    const y = Math.min(y1, y2), hh = Math.max(2, Math.abs(y2 - y1));
+    g.fillStyle = fill; g.fillRect(x, y, plotW - x, hh);
+    g.strokeStyle = stroke; g.lineWidth = 1.5; g.strokeRect(x + .5, y + .5, plotW - x - 1, hh);
+    g.fillStyle = stroke; g.font = '500 11px "IBM Plex Mono", monospace';
+    g.fillText(label, Math.max(x + 4, 4), y - 4 < 12 ? y + hh + 12 : y - 4);
+  };
+  const C = SIG.C, d = SIG.data;
+  if (SIG.layers.zone) d.zones.forEach(z => {
+    const res = z.role === 'resistance';
+    box(z.from, z.top, z.bottom, res ? 'rgba(217,86,74,.10)' : 'rgba(130,207,255,.10)',
+      res ? C.down : C.cyan, (res ? 'Resistance ' : 'Support ') + sigFmt(z.bottom) + '\u2013' + sigFmt(z.top));
+  });
+  if (SIG.layers.fvg) d.fvgs.forEach(f => {
+    box(f.t, f.top, f.bottom, f.type === 'bull' ? 'rgba(156,143,217,.12)' : 'rgba(217,164,65,.12)',
+      f.type === 'bull' ? C.violet : C.gold, (f.type === 'bull' ? 'Bull gap ' : 'Bear gap ') + sigFmt(f.bottom) + '\u2013' + sigFmt(f.top));
+  });
+  g.restore();
+}
+
+function sigRenderAlerts(){
+  const el = sigEl('sigAlerts'), list = SIG.data.alerts;
+  if (!list.length){
+    el.innerHTML = '<div class="sig-status">No signals today. Price and money flow are behaving normally, with nothing near a key level.</div>';
+    return;
+  }
+  el.innerHTML = list.map(a => `
+    <div class="sig-alert ${a.side}">
+      <div class="hd"><div class="nm">\u3010${sigEsc(a.cn)}\u3011<span>${sigEsc(a.en)}</span></div>
+      ${a.side === 'info' ? '' : `<div class="sc">${a.score}<small>/100</small></div>`}</div>
+      <dl><dt>Conclusion</dt><dd>${sigEsc(a.conclusion)}</dd>
+      <dt>Action</dt><dd>${sigEsc(a.action)}</dd>
+      <dt>Key level</dt><dd>${sigEsc(a.level)}</dd></dl>
+    </div>`).join('');
+}
+
+function sigRenderLevels(){
+  const d = SIG.data, C = SIG.C, rows = [];
+  const add = (color, name, val) => rows.push(`<tr><td><span class="sig-sw" style="background:${color}"></span>${sigEsc(name)}</td><td>${val}</td></tr>`);
+  d.zones.filter(z => z.role === 'resistance').sort((a, b) => b.bottom - a.bottom)
+    .forEach(z => add(C.down, 'Resistance zone \u00b7 tested ' + z.tests + 'x', sigFmt(z.bottom) + '\u2013' + sigFmt(z.top)));
+  if (d.trendlines.resistance) add('#D9A7A7', 'Falling trendline (' + d.trendlines.resistance.status + ')', sigFmt(d.trendlines.resistance.value));
+  add(C.gold, 'Last price', sigFmt(d.summary.price));
+  if (d.trendlines.support) add('#E8D3A8', 'Rising trendline (' + d.trendlines.support.status + ')', sigFmt(d.trendlines.support.value));
+  d.zones.filter(z => z.role === 'support').sort((a, b) => b.top - a.top)
+    .forEach(z => add(C.cyan, 'Support zone \u00b7 tested ' + z.tests + 'x', sigFmt(z.bottom) + '\u2013' + sigFmt(z.top)));
+  d.fvgs.forEach(f => add(f.type === 'bull' ? C.violet : C.gold, (f.type === 'bull' ? 'Bullish' : 'Bearish') + ' gap (unfilled)', sigFmt(f.bottom) + '\u2013' + sigFmt(f.top)));
+  const s = d.summary;
+  add(C.dim, 'Money flow: MFI / CMF', sigFmt(s.mfi) + ' / ' + (s.cmf == null ? '\u2014' : Number(s.cmf).toFixed(3)));
+  sigEl('sigLevels').innerHTML = rows.join('');
 }
 </script>
 </body>

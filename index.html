@@ -335,6 +335,11 @@
   #signalPanel .sig-sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:8px; }
   #signalPanel .sig-status { color:var(--ink-dim); padding:18px 0; }
   #signalPanel .sig-status.err { color:var(--down); }
+  #signalPanel .sig-range { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0 6px; }
+  #signalPanel .sig-range button { padding:4px 12px; font-family:var(--mono); font-size:12px; }
+  #signalPanel .sig-range button.on { background:var(--brass); color:var(--white); border-color:var(--brass); }
+  #signalPanel .sig-range .sig-expand { margin-left:auto; }
+  #signalPanel .sig-mkinfo { font-size:13px; color:var(--ink-dim); margin:2px 0 8px; }
   #signalPanel .sig-foot { color:var(--ink-dim); font-size:12px; margin-top:18px; }
 </style>
 </head>
@@ -2433,7 +2438,8 @@ const SIG = {
   C: { up:'#4CAF7D', down:'#D9564A', gold:'#D9A441', cyan:'#82CFFF', violet:'#9C8FD9', ink:'#F5F7FB', dim:'#B7C1D6',
        line:'#33406B', bg:'#0A0E1C', ema10:'#F06F8A', ema20:'#D9A441', ema50:'#4A8FE8', sma200:'#F5F7FB' },
   data: null, charts: [], series: {}, drawQueued: false, busy: false,
-  layers: { ma:true, tl:true, zone:true, fvg:true, mk:true }
+  layers: { ma:true, tl:true, zone:true, fvg:true, mk:true, lbl:true },
+  rangeBars: 63, tall: false
 };
 const sigEl = id => document.getElementById(id);
 const sigFmt = v => v == null ? '\u2014' : Number(v).toFixed(2);
@@ -2508,7 +2514,14 @@ function sigRender(){
       <label><input type="checkbox" data-sig="zone" ${SIG.layers.zone ? 'checked' : ''}>Zones</label>
       <label><input type="checkbox" data-sig="fvg" ${SIG.layers.fvg ? 'checked' : ''}>Gaps (FVG)</label>
       <label><input type="checkbox" data-sig="mk" ${SIG.layers.mk ? 'checked' : ''}>B/S signals</label>
+      <label><input type="checkbox" data-sig="lbl" ${SIG.layers.lbl ? 'checked' : ''}>Zone labels</label>
     </div>
+    <div class="sig-range">
+      ${[['5D',5],['1M',21],['3M',63],['6M',126],['1Y',252],['All',0]].map(([l, n]) =>
+        `<button data-bars="${n}" class="${n === SIG.rangeBars ? 'on' : ''}">${l}</button>`).join('')}
+      <button id="sigExpand" class="sig-expand">${SIG.tall ? 'Shrink chart' : 'Expand chart'}</button>
+    </div>
+    <div class="sig-mkinfo" id="sigMkInfo"></div>
     <div class="sig-pane" id="sigMainPane"><div class="sig-tag" id="sigMaTag"></div><div id="sigMain"></div><canvas id="sigOverlay"></canvas></div>
     <div class="sig-pane"><div class="sig-tag" id="sigMacdTag"></div><div id="sigMacd"></div></div>
     <div class="sig-pane"><div class="sig-tag" id="sigAdxTag"></div><div id="sigAdx"></div></div>
@@ -2518,6 +2531,8 @@ function sigRender(){
   document.querySelectorAll('#signalPanel [data-sig]').forEach(el => el.addEventListener('change', () => {
     SIG.layers[el.dataset.sig] = el.checked; sigApplyLayers();
   }));
+  document.querySelectorAll('#signalPanel [data-bars]').forEach(el => el.addEventListener('click', () => sigSetRange(+el.dataset.bars)));
+  sigEl('sigExpand').addEventListener('click', sigToggleTall);
   sigBuildCharts();
   sigRenderAlerts();
   sigRenderLevels();
@@ -2531,7 +2546,7 @@ function sigBaseOpts(el){
     rightPriceScale: { borderColor: SIG.C.line, minimumWidth: 62 },
     timeScale: { borderColor: SIG.C.line, rightOffset: 2, barSpacing: 7 },
     crosshair: { mode: 0 },
-    handleScale: { axisPressedMouseMove: { time:true, price:false } }
+    handleScale: { axisPressedMouseMove: { time:true, price:true }, pinch:true, mouseWheel:true }
   };
 }
 
@@ -2619,10 +2634,33 @@ function sigBuildCharts(){
     syncing = false;
     sigScheduleDraw();
   }));
-  const n = d.bars.length + d.futureDates.length;
-  main.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 130), to: n });
-
+  if (SIG.tall) sigEl('sigMain').style.height = 'min(70vh, 640px)';
+  main.applyOptions({ height: mainEl.clientHeight });
+  sigSetRange(SIG.rangeBars);
   sigApplyLayers();
+}
+
+// Range buttons: show the last N daily candles (0 = everything)
+function sigSetRange(bars){
+  SIG.rangeBars = bars;
+  const main = SIG.charts[0];
+  if (!main) return;
+  const last = SIG.data.bars.length - 1;
+  const from = bars ? Math.max(0, last - bars + 1) : 0;
+  const pad = bars && bars <= 21 ? 1.5 : Math.max(3, Math.round((last - from) * 0.04));
+  main.timeScale().setVisibleLogicalRange({ from: from - 0.5, to: last + pad });
+  document.querySelectorAll('#signalPanel [data-bars]').forEach(el =>
+    el.classList.toggle('on', +el.dataset.bars === bars));
+}
+
+function sigToggleTall(){
+  SIG.tall = !SIG.tall;
+  const el = sigEl('sigMain');
+  el.style.height = SIG.tall ? 'min(70vh, 640px)' : '';
+  if (SIG.charts[0]) SIG.charts[0].applyOptions({ height: el.clientHeight, width: el.clientWidth });
+  sigEl('sigExpand').textContent = SIG.tall ? 'Shrink chart' : 'Expand chart';
+  sigSetRange(SIG.rangeBars);
+  sigScheduleDraw();
 }
 
 window.addEventListener('resize', () => {
@@ -2638,9 +2676,20 @@ function sigApplyLayers(){
   if (!SIG.series.candles) return;
   SIG.series.ma.forEach(s => s.applyOptions({ visible: SIG.layers.ma }));
   SIG.series.tl.forEach(s => s.applyOptions({ visible: SIG.layers.tl }));
-  SIG.series.candles.setMarkers(SIG.layers.mk ? SIG.data.markers.map(m => ({
-    time:m.time, position:m.position, shape:m.shape, text:m.text, color: m.kind === 'buy' ? SIG.C.up : SIG.C.down
+  const mks = SIG.data.markers;
+  SIG.series.candles.setMarkers(SIG.layers.mk ? mks.map(m => ({
+    time:m.time, position:m.position, shape:m.shape, text:m.text, size:2,
+    color: m.kind === 'buy' ? '#7CFFB2' : '#FF7A6E'
   })) : []);
+  const info = sigEl('sigMkInfo');
+  if (info){
+    const buys = mks.filter(m => m.kind === 'buy').length, sells = mks.length - buys, lastMk = mks[mks.length - 1];
+    info.innerHTML = !SIG.layers.mk ? 'B/S signals hidden.'
+      : !mks.length ? 'No B/S signals in this period.'
+      : `B/S signals: <b class="sig-up">${buys} buy</b> &middot; <b class="sig-down">${sells} sell</b> &middot; latest: `
+        + `<b class="${lastMk.kind === 'buy' ? 'sig-up' : 'sig-down'}">${lastMk.text}</b> on ${sigEsc(lastMk.time)}`
+        + ` <span class="hint">(B = MACD turned up with the trend agreeing, S = the opposite)</span>`;
+  }
   sigScheduleDraw();
 }
 
@@ -2663,27 +2712,43 @@ function sigDrawBoxes(){
   const plotW = main.timeScale().width(), plotH = h - 28;
   g.save(); g.beginPath(); g.rect(0, 0, plotW, plotH); g.clip();
 
+  const labels = [];
   const box = (fromT, top, bottom, fill, stroke, label) => {
     const y1 = candles.priceToCoordinate(top), y2 = candles.priceToCoordinate(bottom);
     if (y1 == null || y2 == null) return;
     let x = main.timeScale().timeToCoordinate(fromT);
-    if (x == null) x = 0;
+    if (x == null || x < 0) x = 0;
     const y = Math.min(y1, y2), hh = Math.max(2, Math.abs(y2 - y1));
     g.fillStyle = fill; g.fillRect(x, y, plotW - x, hh);
-    g.strokeStyle = stroke; g.lineWidth = 1.5; g.strokeRect(x + .5, y + .5, plotW - x - 1, hh);
-    g.fillStyle = stroke; g.font = '500 11px "IBM Plex Mono", monospace';
-    g.fillText(label, Math.max(x + 4, 4), y - 4 < 12 ? y + hh + 12 : y - 4);
+    g.strokeStyle = stroke; g.globalAlpha = 0.7; g.lineWidth = 1;
+    g.strokeRect(x + .5, y + .5, plotW - x - 1, hh); g.globalAlpha = 1;
+    labels.push({ y: y + hh / 2, text: label, color: stroke });
   };
   const C = SIG.C, d = SIG.data;
   if (SIG.layers.zone) d.zones.forEach(z => {
     const res = z.role === 'resistance';
-    box(z.from, z.top, z.bottom, res ? 'rgba(217,86,74,.10)' : 'rgba(130,207,255,.10)',
-      res ? C.down : C.cyan, (res ? 'Resistance ' : 'Support ') + sigFmt(z.bottom) + '\u2013' + sigFmt(z.top));
+    box(z.from, z.top, z.bottom, res ? 'rgba(217,86,74,.08)' : 'rgba(130,207,255,.08)',
+      res ? C.down : C.cyan, (res ? 'R ' : 'S ') + sigFmt(z.bottom) + '\u2013' + sigFmt(z.top));
   });
   if (SIG.layers.fvg) d.fvgs.forEach(f => {
-    box(f.t, f.top, f.bottom, f.type === 'bull' ? 'rgba(156,143,217,.12)' : 'rgba(217,164,65,.12)',
-      f.type === 'bull' ? C.violet : C.gold, (f.type === 'bull' ? 'Bull gap ' : 'Bear gap ') + sigFmt(f.bottom) + '\u2013' + sigFmt(f.top));
+    box(f.t, f.top, f.bottom, f.type === 'bull' ? 'rgba(156,143,217,.10)' : 'rgba(217,164,65,.10)',
+      f.type === 'bull' ? C.violet : C.gold, 'Gap ' + sigFmt(f.bottom) + '\u2013' + sigFmt(f.top));
   });
+  // Small labels tucked against the right edge, nudged apart so none overlap
+  if (SIG.layers.lbl && labels.length){
+    const fs = plotW < 420 ? 9 : 10, lh = fs + 5;
+    g.font = `500 ${fs}px "IBM Plex Mono", monospace`;
+    labels.sort((a, b) => a.y - b.y);
+    let prev = -Infinity;
+    labels.forEach(l => { l.y = Math.max(l.y, prev + lh); prev = l.y; });
+    const overflow = labels[labels.length - 1].y - (plotH - lh / 2);
+    if (overflow > 0) labels.forEach(l => l.y -= overflow);
+    labels.forEach(l => {
+      const tw = g.measureText(l.text).width, x = plotW - tw - 8;
+      g.fillStyle = 'rgba(10,14,28,.82)'; g.fillRect(x - 3, l.y - lh / 2, tw + 6, lh);
+      g.fillStyle = l.color; g.textBaseline = 'middle'; g.fillText(l.text, x, l.y);
+    });
+  }
   g.restore();
 }
 

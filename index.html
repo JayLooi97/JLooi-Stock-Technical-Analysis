@@ -464,6 +464,8 @@
           <th data-key="longTermTrend" title="Price vs 50-day and 200-day moving averages — confirms whether the pullback is fighting the longer-term trend or moving with it">MA Trend</th>
           <th data-key="vol" title="Volume trend over the last 2-3 weeks">Volume</th>
           <th data-key="relStrengthPct" title="This stock's 6-month % move minus the S&P 500's (SPY) over the same window — positive means it's outperforming the market, not just following it">vs S&amp;P%</th>
+          <th data-key="momPercentile" title="12-1 momentum: the stock's return from 12 months ago to 1 month ago, ranked 0-100 against today's universe (99 = strongest). The only indicator that kept an edge in the backtest on this universe after matching for volatility: top group beat similar stocks by ~0.6pp per 21 days, winning ~56% of dates. Modest, useful across many trades, not a forecast for one stock">Mom 12-1</th>
+          <th data-key="volPercentile" title="3-month volatility, annualized, and its rank 0-100 in today's universe (99 = jumpiest). Not a buy/sell signal: shown so a jumpy stock's big moves aren't mistaken for a signal working. In a rising market high-volatility stocks rise more and fall more">Volatility</th>
           <th data-key="rr" title="Reward:Risk using (Target − top of Buy Zone) / (top of Buy Zone − Stop)">R:R</th>
           <th data-key="chasingRisk" title="Chasing Risk: how far price sits above the top of the Buy Zone, in ATR units. Deep-Pullback flag: for 30%+ pullbacks, how many of 4 reversal-confirmation signals are present (price vs 50DMA, weekly trend, RS vs SPY, volume) — few/none confirmed is a falling-knife warning, not a buy signal">Risk</th>
           <th data-key="avgDollarVol20D" title="20-day average dollar volume — each day&#39;s own closing price × that same day&#39;s share volume, averaged over the last 20 trading days (so a big recent move doesn&#39;t re-price older volume). A liquidity read; use the Liquidity filter above to exclude thin names">$Vol(20D)</th>
@@ -994,6 +996,10 @@ async function fetchAllLive(){
       daysSinceSwingLow: r.daysSinceSwingLow ?? null,
       swingLowRecency: r.swingLowRecency || 'unknown',
       rsPercentile: r.rsPercentile ?? null,
+      mom12_1Pct: r.mom12_1Pct ?? null,
+      momPercentile: r.momPercentile ?? null,
+      vol3mPct: r.vol3mPct ?? null,
+      volPercentile: r.volPercentile ?? null,
       avgDollarVol20D: r.avgDollarVol20D ?? null,
       marketCap: r.marketCap ?? null,
       marketCapBand: r.marketCapBand || null,
@@ -1526,6 +1532,20 @@ function ordinal(n){
   if (j===3 && k!==13) return n+'rd';
   return n+'th';
 }
+// 12-1 momentum: percentile badge + raw return. Top 20% green, bottom 20% red.
+function fmtMom(pct, raw){
+  if (pct == null) return '<span class="hint">need 1y history</span>';
+  const cls = pct >= 80 ? 'score hi' : pct <= 20 ? 'score lo' : '';
+  const ord = pct + (pct % 10 === 1 && pct !== 11 ? 'st' : pct % 10 === 2 && pct !== 12 ? 'nd' : pct % 10 === 3 && pct !== 13 ? 'rd' : 'th');
+  return `<span class="${cls}">${ord}</span> <span class="hint">${raw >= 0 ? '+' : ''}${fmt(raw, 0)}%</span>`;
+}
+// Volatility: annualized % plus rank. Deliberately uncoloured: it is context, not a signal.
+function fmtVol(pct, raw){
+  if (pct == null) return '&mdash;';
+  const word = pct >= 80 ? 'very jumpy' : pct >= 60 ? 'jumpy' : pct <= 20 ? 'calm' : 'average';
+  return `${fmt(raw, 0)}% <span class="hint">${word}</span>`;
+}
+
 function fmtRS(v, pct){
   const base = fmtSigned(v);
   if (base==='&mdash;' || pct==null) return base;
@@ -1606,6 +1626,8 @@ const SORT_KEYS = {
   longTermTrend: x=>x.r.longTermTrend||'',
   vol: x=>x.r.vol||'',
   relStrengthPct: x=>x.r.relStrengthPct,
+  momPercentile: x=>x.r.momPercentile,
+  volPercentile: x=>x.r.volPercentile,
   distToSupportATR: x=>x.r.distToSupportATR,
   stopPrice: x=>x.c.stopPrice,
   target: x=>x.c.target,
@@ -2171,7 +2193,7 @@ function render(){
 function renderRows(rows){
   const tbody = document.getElementById('tbody');
   if (rows.length===0){
-    tbody.innerHTML = '<tr><td colspan="21" class="empty">Nothing loaded yet — click "Fetch live data" or "Load sample data" above.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="23" class="empty">Nothing loaded yet — click "Fetch live data" or "Load sample data" above.</td></tr>';
     return;
   }
 
@@ -2213,6 +2235,8 @@ function renderRows(rows){
             <option value="falling" ${r.vol==='falling'?'selected':''}>Falling</option>
           </select></td>
       <td class="${relClass(r.relStrengthPct)}">${fmtRS(r.relStrengthPct, r.rsPercentile)}</td>
+      <td>${fmtMom(r.momPercentile, r.mom12_1Pct)}</td>
+      <td>${fmtVol(r.volPercentile, r.vol3mPct)}</td>
       <td class="score ${rrClass(c.rr)}">${c.rr===null?'&mdash;':fmt(c.rr,1)}</td>
       <td>${chasingBadge(c.chasingRisk)} ${deepPullbackBadge(c)}</td>
       <td>${fmtDollarVol(r.avgDollarVol20D)}</td>
@@ -2325,6 +2349,8 @@ function openDetail(sym, silent){
       <div><div class="k">Volume at the Low</div><div class="v">${r.capitulationRatio!=null?fmt(r.capitulationRatio,2)+'&times; avg'+(r.capitulationFlush?' (flush)':''):'&mdash;'}</div></div>
       <div><div class="k">Post-Low Volume</div><div class="v">${volAccumBadge(r.volumeAccumulation)}</div></div>
       <div><div class="k">vs S&amp;P 500 (6mo)</div><div class="v">${fmtRS(r.relStrengthPct, r.rsPercentile)}</div></div>
+      <div><div class="k">Momentum 12-1</div><div class="v">${fmtMom(r.momPercentile, r.mom12_1Pct)}</div></div>
+      <div><div class="k">Volatility (3mo, annualized)</div><div class="v">${fmtVol(r.volPercentile, r.vol3mPct)}</div></div>
       <div><div class="k">vs Sector (6mo)</div><div class="v">${r.relStrengthVsSectorPct!=null?fmtSigned(r.relStrengthVsSectorPct)+` <span class="hint">(${r.sectorPeerCount} peers)</span>`:'<span class="hint">need 3+ sector peers loaded</span>'}</div></div>
       <div><div class="k">Liquidity (20D $vol)</div><div class="v">${fmtDollarVol(r.avgDollarVol20D)}</div></div>
       <div><div class="k">Market Cap</div><div class="v">${fmtMarketCap(r.marketCap)}${r.marketCapBand?' <span class="hint">('+r.marketCapBand+')</span>':''}</div></div>
@@ -2865,6 +2891,11 @@ function sigRenderLevels(){
     .forEach(z => add(C.cyan, 'Support zone \u00b7 tested ' + z.tests + 'x', sigFmt(z.bottom) + '\u2013' + sigFmt(z.top)));
   d.fvgs.forEach(f => add(f.type === 'bull' ? C.violet : C.gold, (f.type === 'bull' ? 'Bullish' : 'Bearish') + ' gap (unfilled)', sigFmt(f.bottom) + '\u2013' + sigFmt(f.top)));
   const s = d.summary;
+  const scr = (typeof data !== 'undefined' && Array.isArray(data)) ? data.find(x => x.sym === d.ticker) : null;
+  if (s.mom12_1 != null) add(C.dim, 'Momentum 12-1' + (scr && scr.momPercentile != null ? ' \u00b7 rank ' + scr.momPercentile + '/100' : ''),
+    (s.mom12_1 >= 0 ? '+' : '') + Number(s.mom12_1).toFixed(0) + '%');
+  if (s.vol3m != null) add(C.dim, 'Volatility (3mo, annualized)' + (scr && scr.volPercentile != null ? ' \u00b7 rank ' + scr.volPercentile + '/100' : ''),
+    Number(s.vol3m).toFixed(0) + '%');
   add(C.dim, 'Money flow: MFI / CMF', sigFmt(s.mfi) + ' / ' + (s.cmf == null ? '\u2014' : Number(s.cmf).toFixed(3)));
   sigEl('sigLevels').innerHTML = rows.join('');
 }

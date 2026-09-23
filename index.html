@@ -1003,6 +1003,7 @@ async function fetchAllLive(){
       mom12_1Pct: r.mom12_1Pct ?? null,
       momPercentile: r.momPercentile ?? null,
       vol3mPct: r.vol3mPct ?? null,
+      stretch20ATR: r.stretch20ATR ?? null,
       volPercentile: r.volPercentile ?? null,
       avgDollarVol20D: r.avgDollarVol20D ?? null,
       marketCap: r.marketCap ?? null,
@@ -2142,6 +2143,7 @@ function renderDailyPicks(rows){
           </div>
           <div class="pick-meta">${r.sector||'&mdash;'} &middot; ${fmt(num(r.price),2)} &middot; ${fmtMarketCap(r.marketCap)}</div>
           <div class="pick-meta">Mom 12-1 ${fmtMom(r.momPercentile, r.mom12_1Pct)} &middot; Vol ${fmtVol(r.volPercentile, r.vol3mPct)}</div>
+          <div class="pick-meta">Rel. volume ${r.relativeVolume20!=null?fmt(r.relativeVolume20,1)+'&times;':'&mdash;'}${r.stretch20ATR!=null && r.stretch20ATR>2 ? ` &middot; <span class="badge" style="border:1px solid var(--amber);color:var(--amber);" title="${fmt(r.stretch20ATR,1)} ATR above its 20-day average. In the replay, strong names this stretched dipped slightly over the next 1-2 days, then kept outperforming by 21 days: a reason to wait for a small pullback, not to skip it">Stretched &mdash; wait 1&ndash;2 days</span>` : ''}</div>
           <div class="pick-pillars">
             ${gl.items.map(i=>`<span class="${i.pass?'on':'off'}" title="${i.label}">${i.pass?'&#9679;':'&#9675;'} ${i.label}</span>`).join('')}
           </div>
@@ -2496,7 +2498,7 @@ const SIG = {
   },
   C: {}, theme: 'dark', simple: false,
   data: null, charts: [], series: {}, drawQueued: false, busy: false,
-  layers: { ma:true, tl:true, zone:true, fvg:true, mk:true, lbl:false },
+  layers: { ma:true, tl:true, zone:true, fvg:true, mk:true, warn:false, lbl:false },
   rangeBars: 63, tall: false, priceLines: []
 };
 const sigEl = id => document.getElementById(id);
@@ -2601,7 +2603,8 @@ function sigRender(){
       <label><input type="checkbox" data-sig="tl" ${SIG.layers.tl ? 'checked' : ''}>Trendlines</label>
       <label><input type="checkbox" data-sig="zone" ${SIG.layers.zone ? 'checked' : ''}>Zones</label>
       <label><input type="checkbox" data-sig="fvg" ${SIG.layers.fvg ? 'checked' : ''}>Gaps (FVG)</label>
-      <label><input type="checkbox" data-sig="mk" ${SIG.layers.mk ? 'checked' : ''}>B/S signals</label>
+      <label title="Past points where the bearish money-flow divergence fired: the one chart signal that held up in the backtest"><input type="checkbox" data-sig="warn" ${SIG.layers.warn ? 'checked' : ''}>Trim warnings (W)</label>
+      <label title="MACD-cross markers (B = MACD turned up, S = turned down). In the backtest on your data these were close to a coin flip, so read them alongside the levels"><input type="checkbox" data-sig="mk" ${SIG.layers.mk ? 'checked' : ''}>B/S signals</label>
       <label><input type="checkbox" data-sig="lbl" ${SIG.layers.lbl ? 'checked' : ''}>Zone labels</label>
     </div>
     <div class="sig-range">
@@ -2877,19 +2880,27 @@ function sigApplyLayers(){
   if (!SIG.series.candles) return;
   SIG.series.ma.forEach(s => s.applyOptions({ visible: SIG.layers.ma }));
   SIG.series.tl.forEach(s => s.applyOptions({ visible: SIG.layers.tl }));
-  const mks = SIG.data.markers;
-  SIG.series.candles.setMarkers(SIG.layers.mk ? mks.map(m => ({
-    time:m.time, position:m.position, shape:m.shape, text:m.text, size:2,
-    color: m.kind === 'buy' ? SIG.C.up : SIG.C.down
-  })) : []);
+  const mks = SIG.data.markers || [], wks = SIG.data.warnings || [];
+  const shown = []
+    .concat(SIG.layers.warn ? wks.map(w => ({ time:w.time, position:'aboveBar', shape:'circle', text:'W', size:1.5, color:SIG.C.gold })) : [])
+    .concat(SIG.layers.mk ? mks.map(m => ({ time:m.time, position:m.position, shape:m.shape, text:m.text, size:1.5,
+      color: m.kind === 'buy' ? SIG.C.up : SIG.C.down })) : [])
+    .sort((a, b) => a.time < b.time ? -1 : a.time > b.time ? 1 : 0);
+  SIG.series.candles.setMarkers(shown);
   const info = sigEl('sigMkInfo');
   if (info){
-    const buys = mks.filter(m => m.kind === 'buy').length, sells = mks.length - buys, lastMk = mks[mks.length - 1];
-    info.innerHTML = !SIG.layers.mk ? 'B/S signals hidden.'
-      : !mks.length ? 'No B/S signals in this period.'
-      : `B/S signals: <b class="sig-up">${buys} buy</b> &middot; <b class="sig-down">${sells} sell</b> &middot; latest: `
-        + `<b class="${lastMk.kind === 'buy' ? 'sig-up' : 'sig-down'}">${lastMk.text}</b> on ${sigEsc(lastMk.time)}`
-        + ` <span class="hint">(B = MACD turned up with the trend agreeing, S = the opposite)</span>`;
+    const parts = [];
+    if (SIG.layers.warn){
+      const lastW = wks[wks.length - 1];
+      parts.push(!wks.length ? 'No trim warnings in the last year.'
+        : `<b style="color:${SIG.C.gold}">W</b> trim warnings: ${wks.length} in the last year, latest ${sigEsc(lastW.time)}.`
+          + ` <span class="hint">W means money flow weakened while price was near its highs. On average the stock then lagged SPY by under 1% over the next month; it often still rose. A reason to trim or tighten a stop, not to sell everything.</span>`);
+    }
+    if (SIG.layers.mk){
+      const lastMk = mks[mks.length - 1];
+      parts.push(!mks.length ? 'No B/S markers.' : `B/S: latest <b>${lastMk.text}</b> on ${sigEsc(lastMk.time)} <span class="hint">(MACD crosses)</span>`);
+    }
+    info.innerHTML = parts.join('<br>') || 'Markers hidden.';
   }
   sigScheduleDraw();
 }
@@ -2961,7 +2972,7 @@ function sigRenderAlerts(){
   }
   el.innerHTML = list.map(a => `
     <div class="sig-alert ${a.side}">
-      <div class="hd"><div class="nm">\u3010${sigEsc(a.cn)}\u3011<span>${sigEsc(a.en)}</span></div>
+      <div class="hd"><div class="nm">${sigEsc(a.en)}</div>
       ${a.side === 'info' ? '' : `<div class="sc">${a.score}<small>/100</small></div>`}</div>
       <dl><dt>Conclusion</dt><dd>${sigEsc(a.conclusion)}</dd>
       <dt>Action</dt><dd>${sigEsc(a.action)}</dd>

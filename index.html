@@ -337,6 +337,10 @@
   #signalPanel .sig-status.err { color:var(--down); }
   #signalPanel.sig-cream .sig-pane { background:#FBF4E4; border-color:#D6C9AE; }
   #signalPanel.sig-cream .sig-tag { color:#6E6455; }
+  #signalPanel .sig-nav { display:flex; align-items:center; gap:8px; margin:6px 0 2px; }
+  #signalPanel .sig-nav input[type=range] { flex:1; min-width:0; height:28px; accent-color:var(--brass); cursor:pointer; }
+  #signalPanel .sig-nav button { min-width:40px; padding:6px 10px; font-size:18px; line-height:1; }
+  #signalPanel .sig-nav #sigLatest { font-size:12px; min-width:0; font-family:var(--mono); }
   #signalPanel .sig-range { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0 6px; }
   #signalPanel .sig-range button { padding:4px 12px; font-family:var(--mono); font-size:12px; }
   #signalPanel .sig-range button.on { background:var(--brass); color:var(--white); border-color:var(--brass); }
@@ -491,9 +495,9 @@
     <span class="hint" id="pagerCount"></span>
   </div>
 
-  <div class="panel" id="detailPanel" style="display:none;"></div>
-
   <div class="panel" id="signalPanel" style="display:none;"></div>
+
+  <div class="panel" id="detailPanel" style="display:none;"></div>
 
   <details class="panel method">
     <summary>How to read this</summary>
@@ -1675,6 +1679,12 @@ function searchTicker(){
   searchTerm = term;
   document.getElementById('clearSearchBtn').style.display = term ? '' : 'none';
   render();
+  const sym = term.toUpperCase();
+  if (!sym) return;
+  if (data.some(d => d.sym.toUpperCase() === sym)) openDetail(data.find(d => d.sym.toUpperCase() === sym).sym);
+  // Not in the screener at all (e.g. SOXL): open the chart on its own. A partial
+  // match like "NV" just filters the table, as before.
+  else if (!data.some(d => d.sym.toUpperCase().includes(sym)) && /^[A-Z0-9:.\-]{1,20}$/.test(sym)) openSignal(sym);
 }
 function clearSearch(){
   document.getElementById('searchTicker').value = '';
@@ -1747,7 +1757,7 @@ function paginateAndRender(rows, signature){
 // (Setup Quality, Trend Continuation, Tech Confirm — deliberately NOT
 // blended together elsewhere, see Methodology) as three pillars, and folds
 // the remaining raw signals into three merged pillars instead of six
-// separate votes: Momentum (MACD + RSI), Volume (relative volume +
+// separate votes: Momentum (12-1 momentum rank; was MACD + RSI), Volume (relative volume +
 // accumulation), and Entry Timing (in the Buy Zone, not extended, not
 // stale — the three checks that are really all asking "is right now a
 // good place to get in," not three separate pieces of evidence). Six
@@ -1773,11 +1783,16 @@ function greenLightChecklist(r, c){
     { label:'Setup Quality',   pass: c.setupQualityScore!=null && c.setupQualityScore>=70 },
     { label:'Trend Cont.',     pass: c.trendContinuationScore!=null && c.trendContinuationScore>=65 },
     { label:'Tech Confirm',    pass: r.technicalConfirmationScore!=null && r.technicalConfirmationScore>=70 },
-    // Momentum: MACD (trend-momentum confirmation) AND RSI (oscillator
-    // readiness) both have to agree — one vote for "momentum backs this up,"
-    // not two votes for two readings of a similar thing.
-    { label:'Momentum',        pass: (r.macdHistogram!=null && r.macdHistogram>0 && (r.macdDirection==='rising' || r.macdCrossUp))
-                                      && (r.rsi14!=null && r.rsi14>=35 && r.rsi14<=70 && r.rsiDirection!=='falling') },
+    // Momentum: 12-1 momentum rank in today's universe, 60th percentile or
+    // better. Replaced the old MACD+RSI pillar after the Signal Desk
+    // backtest on this universe (~830 tickers, 98 dates, 21-day returns vs
+    // SPY): MACD crosses and RSI readings were coin flips, while 12-1
+    // momentum was the one indicator that still beat stocks of the same
+    // volatility (+0.61pp overall; +0.43pp, won 58% of dates, among stocks
+    // already in a 10-40% pullback — the pool these picks come from). That
+    // pullback-pool edge came mostly from the newer half of the window
+    // (+0.83pp vs +0.01pp older), so treat it as a modest tilt, not proof.
+    { label:'Momentum 12-1',   pass: r.momPercentile!=null && r.momPercentile>=60 },
     // Volume: relative volume alone doesn't say whether it came on up days
     // or down days — accumulation does. Both have to agree for one vote,
     // instead of "activity" and "quality of activity" each voting alone.
@@ -1880,6 +1895,7 @@ function evaluateAlerts(rows){
   // rank of the blended strength figure, then liquidity as the tiebreak.
   hits.sort((a, b) =>
     (b.gl.count - a.gl.count) ||
+    ((num(b.r.momPercentile) ?? -1) - (num(a.r.momPercentile) ?? -1)) ||
     ((num(b.c.setupQualityScore) ?? -1) - (num(a.c.setupQualityScore) ?? -1)) ||
     ((num(b.r.avgDollarVol20D) ?? -1) - (num(a.r.avgDollarVol20D) ?? -1)));
   return hits;
@@ -2060,6 +2076,10 @@ function renderDailyPicks(rows){
   scored.sort((a,b)=>{
     const gd = b.gl.count - a.gl.count;
     if (gd !== 0) return gd;
+    // Tiebreak on 12-1 momentum rank (the backtest-supported measure) ahead
+    // of the Setup-Quality-led composite, which failed its out-of-period test.
+    const mo = (b.r.momPercentile??-1) - (a.r.momPercentile??-1);
+    if (mo !== 0) return mo;
     const pr = (b.pctRank??-1) - (a.pctRank??-1);
     if (pr !== 0) return pr;
     return (b.r.avgDollarVol20D??-1) - (a.r.avgDollarVol20D??-1);
@@ -2120,7 +2140,8 @@ function renderDailyPicks(rows){
             <span class="pick-sym">${r.sym}</span>
             <span class="badge mom-up">${fallback ? (pctRank!=null?'pct. '+pctRank:'&mdash;') : gl.count+'/'+gl.total}</span>
           </div>
-          <div class="pick-meta">${r.sector||'&mdash;'} &middot; ${fmt(num(r.price),2)} &middot; ${fmtMarketCap(r.marketCap)}${pctRank!=null?` &middot; ${pctRank}th pct.`:''}</div>
+          <div class="pick-meta">${r.sector||'&mdash;'} &middot; ${fmt(num(r.price),2)} &middot; ${fmtMarketCap(r.marketCap)}</div>
+          <div class="pick-meta">Mom 12-1 ${fmtMom(r.momPercentile, r.mom12_1Pct)} &middot; Vol ${fmtVol(r.volPercentile, r.vol3mPct)}</div>
           <div class="pick-pillars">
             ${gl.items.map(i=>`<span class="${i.pass?'on':'off'}" title="${i.label}">${i.pass?'&#9679;':'&#9675;'} ${i.label}</span>`).join('')}
           </div>
@@ -2280,7 +2301,7 @@ function openDetail(sym, silent){
   const priceNum = num(r.price);
   const inZoneNow = priceNum!==null && c.buyZones.some(z => priceNum>=z.low && priceNum<=z.high);
   panel.innerHTML = `
-    <h2>${r.sym} &mdash; ${r.sector} <button onclick="openSignal('${r.sym}')" style="font-size:13px; vertical-align:middle; margin-left:8px;">Signal chart</button></h2>
+    <h2>${r.sym} &mdash; ${r.sector} <button onclick="openSignal('${r.sym}')" style="font-size:13px; vertical-align:middle; margin-left:8px;" title="Scroll back to (or reopen) this ticker's chart">Chart &uarr;</button></h2>
     <div style="display:flex; align-items:baseline; gap:14px; margin:-2px 0 14px; flex-wrap:wrap;">
       <div style="font-family:var(--serif); font-weight:700; font-size:42px; line-height:1; color:${inZoneNow?'var(--up)':'var(--ink)'};">${priceNum!==null?fmt(priceNum,2):'&mdash;'}</div>
       <div class="hint" style="font-size:13px;">
@@ -2358,7 +2379,7 @@ function openDetail(sym, silent){
     <div style="margin-top:14px;"><div class="k" style="margin-bottom:4px;">Historical Analogues (21D forward, pooled across today's universe)</div>${analogueDetail(r.universeAnalogues, 'pooled')}</div>
     <div style="margin-top:14px;"><div class="k" style="margin-bottom:4px;">Historical Analogues (21D forward, this ticker only)</div>${analogueDetail(r.historicalAnalogues, 'self')}</div>
   `;
-  if (!silent) panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+  if (!silent) openSignal(sym);   // chart sits above this panel and scrolls into view
 }
 
 // --- Header blurb --------------------------------------------------------
@@ -2515,33 +2536,46 @@ function closeSignal(){
   sigEl('signalPanel').style.display = 'none';
 }
 
+// Opened automatically when a row, pick card or tape item is tapped, or when
+// a search matches a ticker — the "Signal chart" buttons still work too.
+// Taps while a chart is loading are queued (only the latest one is kept), and
+// re-opening the ticker already on screen within 15 minutes just scrolls to it.
 async function openSignal(sym){
   sym = String(sym || '').trim().toUpperCase();
   if (!sym){ setStatus('Type a ticker in the search box, then tap Signal chart.', true); return; }
   const url = (document.getElementById('backendUrl').value || '').trim();
   if (!url){ setStatus('Add your Apps Script URL first — the signal chart runs through your backend.', true); return; }
-  if (SIG.busy) return;
-  SIG.busy = true;
   const panel = sigEl('signalPanel');
+  if (SIG.busy){ SIG.pending = sym; return; }
+  if (SIG.data && SIG.data.ticker === sym && SIG.charts.length && panel.style.display !== 'none'
+      && Date.now() - (SIG.loadedAt || 0) < 15 * 60 * 1000){
+    panel.scrollIntoView({ behavior:'smooth', block:'start' });
+    return;
+  }
+  SIG.busy = true; SIG.pending = null;
   SIG.charts.forEach(c => c.remove()); SIG.charts = []; SIG.series = {};
   panel.style.display = 'block';
   panel.innerHTML = `<div class="sig-head"><h2>${sigEsc(sym)} &mdash; Signal chart</h2>
     <button class="sig-close" onclick="closeSignal()">&times; Close</button></div>
-    <div class="sig-status" id="sigStatus">Analysing ${sigEsc(sym)}&hellip; this takes about 5&ndash;10 seconds.</div>`;
+    <div class="sig-status" id="sigStatus">Analysing ${sigEsc(sym)}&hellip; this takes about 5&ndash;10 seconds the first time.</div>`;
   panel.scrollIntoView({ behavior:'smooth', block:'start' });
   try {
     await sigLoadLib();
     const q = url + (url.includes('?') ? '&' : '?') + 'action=signal&symbol=' + encodeURIComponent(sym);
     const json = await jsonpFetch(q, 60000);
+    if (SIG.pending && SIG.pending !== sym) return;          // a newer tap is waiting; skip this one
     if (json.error) throw new Error(json.error);
     if (!json.bars) throw new Error('your backend doesn\u2019t have the signal feature yet. Paste in the new Code.gs and redeploy it as a new version.');
-    SIG.data = json;
+    SIG.data = json; SIG.loadedAt = Date.now();
     sigRender();
   } catch (err) {
+    if (SIG.pending && SIG.pending !== sym) return;
     const st = sigEl('sigStatus');
     if (st){ st.className = 'sig-status err'; st.textContent = 'Signal chart failed: ' + err.message; }
   } finally {
     SIG.busy = false;
+    const next = SIG.pending;
+    if (next && next !== sym){ SIG.pending = null; openSignal(next); }
   }
 }
 
@@ -2579,6 +2613,12 @@ function sigRender(){
     </div>
     <div class="sig-mkinfo" id="sigMkInfo"></div>
     <div class="sig-pane" id="sigMainPane"><div class="sig-tag" id="sigMaTag"></div><div id="sigMain"></div><canvas id="sigOverlay"></canvas></div>
+    <div class="sig-nav">
+      <button id="sigZoomOut" title="Zoom out: show more candles" aria-label="Zoom out">&minus;</button>
+      <input type="range" id="sigScroll" min="0" max="100" step="1" value="100" aria-label="Scroll the chart left or right">
+      <button id="sigZoomIn" title="Zoom in: bigger candles" aria-label="Zoom in">+</button>
+      <button id="sigLatest" title="Jump back to the latest candle">Latest &#9656;</button>
+    </div>
     <div class="sig-pane sig-sub"><div class="sig-tag" id="sigMacdTag"></div><div id="sigMacd"></div></div>
     <div class="sig-pane sig-sub"><div class="sig-tag" id="sigAdxTag"></div><div id="sigAdx"></div></div>
     <h3>Alerts</h3><div id="sigAlerts"></div>
@@ -2744,7 +2784,12 @@ function sigBuildCharts(){
     SIG.charts.forEach(dst => { if (dst !== src) dst.timeScale().setVisibleLogicalRange(r); });
     syncing = false;
     sigScheduleDraw();
+    sigSyncScroller();
   }));
+  sigEl('sigScroll').addEventListener('input', e => sigScrollTo(+e.target.value));
+  sigEl('sigZoomIn').addEventListener('click', () => sigZoom(1 / 1.6));
+  sigEl('sigZoomOut').addEventListener('click', () => sigZoom(1.6));
+  sigEl('sigLatest').addEventListener('click', sigToLatest);
   if (SIG.tall) sigEl('sigMain').style.height = 'min(70vh, 640px)';
   main.applyOptions({ height: mainEl.clientHeight });
   sigSetRange(SIG.rangeBars);
@@ -2762,6 +2807,51 @@ function sigSetRange(bars){
   main.timeScale().setVisibleLogicalRange({ from: from - 0.5, to: last + pad });
   document.querySelectorAll('#signalPanel [data-bars]').forEach(el =>
     el.classList.toggle('on', +el.dataset.bars === bars));
+}
+
+// --- Scroll bar + zoom buttons -------------------------------------------
+// The slider's value is the right edge of the visible window, in candles.
+// Dragging it pans; the +/- buttons change how many candles fit on screen
+// (zooming around the centre). Pinch/drag on the chart still work, and keep
+// the slider in step via sigSyncScroller().
+function sigNavState(){
+  const main = SIG.charts[0], d = SIG.data;
+  if (!main || !d) return null;
+  const r = main.timeScale().getVisibleLogicalRange();
+  if (!r) return null;
+  const last = d.bars.length - 1;
+  return { r, w: r.to - r.from, last, maxTo: last + d.futureDates.length };
+}
+let sigSliderBusy = false;
+function sigSyncScroller(){
+  const st = sigNavState(), el = sigEl('sigScroll');
+  if (!st || !el || sigSliderBusy) return;
+  el.min = Math.max(0, Math.floor(st.w - 1));
+  el.max = Math.ceil(st.maxTo);
+  el.value = Math.round(st.r.to);
+}
+function sigScrollTo(to){
+  const st = sigNavState();
+  if (!st) return;
+  sigSliderBusy = true;
+  SIG.charts[0].timeScale().setVisibleLogicalRange({ from: to - st.w, to: to });
+  sigSliderBusy = false;
+  document.querySelectorAll('#signalPanel [data-bars]').forEach(el => el.classList.remove('on'));
+}
+function sigZoom(factor){
+  const st = sigNavState();
+  if (!st) return;
+  const w = Math.max(5, Math.min(st.maxTo + 1, st.w * factor));
+  const centre = (st.r.from + st.r.to) / 2;
+  let to = Math.min(st.maxTo, centre + w / 2);
+  SIG.charts[0].timeScale().setVisibleLogicalRange({ from: to - w, to: to });
+  document.querySelectorAll('#signalPanel [data-bars]').forEach(el => el.classList.remove('on'));
+}
+function sigToLatest(){
+  const st = sigNavState();
+  if (!st) return;
+  const to = st.last + Math.max(1.5, st.w * 0.04);
+  SIG.charts[0].timeScale().setVisibleLogicalRange({ from: to - st.w, to: to });
 }
 
 function sigToggleTall(){

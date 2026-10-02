@@ -263,6 +263,12 @@
   .picks-why[open] summary::after { content:' \25B4'; }
   .picks-why p { margin:6px 0 0; font-size:11.5px; line-height:1.45; color:var(--ink-dim); }
   .picks-track { margin:-2px 0 10px; font-size:11.5px; line-height:1.45; color:var(--ink-dim); }
+  .pick-age { font-size:11px; line-height:1.35; margin:0 0 5px; color:var(--ink-dim); }
+  .pick-age.on { color:var(--brass); font-weight:600; }
+  .pick-age.dim { opacity:.75; }
+  .pick-sell { font-size:11px; line-height:1.35; margin:0 0 5px; color:var(--ink); }
+  .pick-sell .hint { font-size:10.5px; }
+  .picks-due { margin:-4px 0 10px; font-size:12px; line-height:1.45; color:var(--amber); }
   .picks-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(156px,1fr)); gap:8px; }
   .pick-card { background:var(--panel-raised); border:1px solid var(--line); border-radius:3px; padding:8px 9px; cursor:pointer; }
   .pick-card:hover { border-color: var(--teal); }
@@ -565,8 +571,12 @@
       <li>At most 5 names that pass at least 4 of the 6 checklist pillars. Names that also have MACD timing (a B at the last close or one session ago, or close to the B trigger) come first, then the strongest 12-1 momentum. A name with a fresh trim warning (W) is left out. The same list goes out in the Telegram brief.</li>
       <li><b>The 6 pillars:</b> Setup Quality 70+ &middot; Trend Cont. 65+ &middot; Tech Confirm 70+ &middot; Momentum 12-1 in the top 40% &middot; Volume (1.3&times; normal, on buying days) &middot; Entry Timing (inside the Buy Zone, not extended, not stale). It shows what is confirmed; it is not a score. In testing, 5 or 6 green did not do better than 4.</li>
       <li><b>Soft day:</b> when nothing passes, the list shows today's relative leaders instead, and says so.</li>
+      <li><b>Day N on the list</b> &mdash; how many sessions in a row the name has been in Today's Picks (from the Picks Log), with the close when it was first picked and the change since. <i>Back on the list</i> = picked in the last two weeks, dropped off, and returned. In three backtests, buying at the next day's close did slightly better on average than buying straight away; whether the name was still on the list that day made no reliable difference, so use it for timing, not as a filter.</li>
       <li><b>Stretched &mdash; wait 1&ndash;2 days:</b> more than 2 ATR above its 20-day average. Strong names this stretched usually paused for a day or two, then kept going.</li>
       <li><b>Evidence:</b> in your backtest (94 dates, result 21 trading days later), this list beat the average stock in your universe by about 3.3 points, against 2.7 for the old Top Picks. The rule was chosen on that same data, so the <b>Picks Log</b> tab in your first sheet now records every day's picks and their real 5, 10 and 21-day results ("Live record" line above the cards). Judge it after about 3 months.</li>
+      <li><b>Selling (your exit test, 90 test days, top 5 picks):</b> holding with no fixed target did best, and longer was better: about +9% per trade after 40 trading days and +13% after 60, 7.9 points better than the average stock, at a steady ~1.1% a week. Targets of +5% to +20% and trailing stops cut the big winners short and lost most of that edge (+5% was reached by about 70% of picks within 10 days, but left no edge, because the misses fell hard).</li>
+      <li><b>The cost of holding, and the 15% stop:</b> with no stop about half the trades lost (on average 18&ndash;21%) and the worst tenth lost 41&ndash;44%. A 15% stop-loss was the best safety net: the worst tenth lost about 16% instead, and it kept about half the edge (+7.9% per trade at 60 days). A 10% stop sold too many trades that later recovered. Most of the edge came from the newer half of the period, and stocks that collapsed out of your list aren't counted, so treat it as a guide, not a promise.</li>
+      <li><b>Sell by / stop</b> &mdash; each pick shows the date its 60 trading days end, counted from the first session you could buy it (the session after it was first picked), and a stop price 15% below today's price. If you buy on another day or at another price, set the stop 15% below your own buy and count 60 trading days from it. The Telegram brief reminds you when 60 days are up for earlier picks.</li>
     </ul>
 
     <h3>Signal Radar and the B / S / W badges</h3>
@@ -2432,6 +2442,26 @@ function renderDailyPicks(rows){
   `;
 }
 
+// "Thu 1 Oct" for a yyyy-mm-dd date.
+function dayLabel(iso){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+  if (!m) return '';
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 12));
+  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' +
+    ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()];
+}
+// How long a pick has been on the list (p.onList comes from the Picks Log history).
+function onListLine(p){
+  const o = p.onList;
+  if (!o) return '';
+  if (o.days >= 2){
+    const ch = (o.sinceClose > 0 && num(p.price) > 0) ? (num(p.price) / o.sinceClose - 1) * 100 : null;
+    return `<div class="pick-age on" title="Sessions in a row in Today's Picks, from the Picks Log">Day ${o.days} on the list &middot; first picked ${escHtml(dayLabel(o.since))}${o.sinceClose > 0 ? ` at ${fmt(o.sinceClose,2)}` : ''}${ch != null ? ` (${ch >= 0 ? '+' : '&minus;'}${Math.abs(ch).toFixed(1)}% since)` : ''}</div>`;
+  }
+  if (o.lastSeen) return `<div class="pick-age">Back on the list &middot; last picked ${escHtml(dayLabel(o.lastSeen))}</div>`;
+  return `<div class="pick-age dim">New today</div>`;
+}
+
 function renderMergedPicks(panel, rows){
   const bySym = {};
   rows.forEach(x => { bySym[x.r.sym] = x; });
@@ -2450,10 +2480,14 @@ function renderMergedPicks(panel, rows){
     + (soft ? ' Soft day: nothing qualified, so these are today\u2019s top percentile-rank names instead.' : '')
     + (timedRule
       ? ' In your backtest this rule beat the old Top Picks in both halves of the period (about +3.3 vs +2.7 points over 21 days, against the average stock), but it was chosen on that same data. The Picks Log tab in your first sheet keeps the live record.'
-      : ' The Picks Log tab in your first sheet keeps the live record of every day\u2019s picks.');
-  const track = (picksInfo.track && picksInfo.track.text)
+      : ' The Picks Log tab in your first sheet keeps the live record of every day\u2019s picks.')
+    + ` Selling: in your exit test, holding with no fixed target did best (60 days beat 40), and a ${picksInfo.stopPct || 15}% stop-loss kept about half of that with much smaller worst cases, so each card shows a sell-by date and a stop price (details in How to read this).`;
+  const due = picksInfo.track && picksInfo.track.sellDue;
+  const track = ((picksInfo.track && picksInfo.track.text)
     ? `<div class="picks-track" title="From the Picks Log tab in your first sheet: each morning's picks and how they did 5, 10 and 21 US sessions later, vs SPY and vs the average stock in your universe.">Live record: ${escHtml(picksInfo.track.text)}</div>`
-    : '';
+    : '') + ((due && Array.isArray(due.syms) && due.syms.length)
+    ? `<div class="picks-due">${picksInfo.holdDays || 60} trading days are up for picks first chosen ${escHtml(dayLabel(due.first))}: <b>${due.syms.map(x => escHtml(safeSym(x))).join(', ')}</b>. If you still hold them, the tested plan sells in the next session (${escHtml(dayLabel(due.sellBy))}).</div>`
+    : '');
   panel.style.display = 'block';
   const head = `
     <div class="picks-head">
@@ -2478,6 +2512,8 @@ function renderMergedPicks(panel, rows){
     return `
       <div class="pick-card" onclick="openDetail('${sym}')">
         <div class="pick-top"><span class="pick-sym">${sym}</span><span class="badge mom-up">${badge}</span></div>
+        ${onListLine(p)}
+        ${p.sellBy ? `<div class="pick-sell" title="Sell by: ${picksInfo.holdDays || 60} US trading days after the first session it could be bought (the session after it was first picked). Stop: ${picksInfo.stopPct || 15}% below today's price; if you buy at another price, set it ${picksInfo.stopPct || 15}% below your own buy. In your exit test, holding with no fixed target did best (60 days beat 40), and a ${picksInfo.stopPct || 15}% stop-loss kept about half of that with much smaller worst cases.">Sell by <b>${escHtml(dayLabel(p.sellBy))}</b>${p.stop ? ` &middot; stop <b>${fmt(num(p.stop),2)}</b> <span class="hint">(&minus;${picksInfo.stopPct || 15}%)</span>` : ` <span class="hint">&middot; ${picksInfo.holdDays || 60}-day hold</span>`}</div>` : ''}
         ${tags ? `<div class="pick-tags">${tags}</div>` : ''}
         ${timing}
         <div class="pick-meta">${r.sector || '&mdash;'} &middot; ${fmt(num(r.price),2)} &middot; ${fmtMarketCap(r.marketCap)}</div>

@@ -824,7 +824,7 @@ function radarBadge(r){
   const rd = r.radar;
   if (!rd) return r.macdCrossUp ? '<span class="badge mom-up">cross</span>' : '';
   const out = [];
-  if (rd.sig) out.push(`<span class="badge ${rd.sig === 'B' ? 'sig-b' : 'sig-s'}" title="${rd.sig} marker ${rd.sigAgo === 0 ? 'at the last close' : 'one session ago'}">${rd.sig}${rd.sigAgo ? '&middot;1d' : ''}</span>`);
+  if (rd.sig) out.push(`<span class="badge ${rd.sig === 'B' ? 'sig-b' : 'sig-s'}" title="${rd.sig} marker ${rd.sigAgo === 0 ? 'at the last close' : 'one session ago'}${rd.fragile ? ' — fragile: the opposite signal is within 0.5%, MACD almost flat' : ''}" ${rd.fragile ? 'style="opacity:.55;border-style:dashed;"' : ''}>${rd.sig}${rd.sigAgo ? '&middot;1d' : ''}${rd.fragile ? '~' : ''}</span>`);
   if (rd.w != null) out.push('<span class="badge sig-w" title="Trim warning: money flow weakening near the highs">W</span>');
   if (!rd.sig && rd.near && rd.trig != null) out.push(`<span class="badge sig-near" title="${radarTrigText(rd)}">${rd.next}?</span>`);
   return out.join(' ');
@@ -871,7 +871,7 @@ function renderRadar(){
     const r = bySym[s];
     if (!r || !r.radar || picks.some(p => p.sym === s)) return '';
     const rd = r.radar, bits = [];
-    if (rd.sig) bits.push(`<span class="badge ${rd.sig === 'B' ? 'sig-b' : 'sig-s'}">${rd.sig}</span> ${rd.sigAgo === 0 ? 'at the last close' : 'one session ago'}`);
+    if (rd.sig) bits.push(`<span class="badge ${rd.sig === 'B' ? 'sig-b' : 'sig-s'}">${rd.sig}</span> ${rd.sigAgo === 0 ? 'at the last close' : 'one session ago'}${rd.fragile ? ' <span class="hint">(fragile: MACD almost flat, ignore)</span>' : ''}`);
     if (rd.w != null) bits.push('<span class="badge sig-w">W</span> trim warning');
     if (rd.near && rd.trig != null) bits.push(escHtml(radarTrigText(rd)));
     if (!bits.length) return '';
@@ -883,7 +883,7 @@ function renderRadar(){
     <div class="radar-head">
       <h2>Signal Radar</h2>
       <span class="radar-counts">since the last close: <b>${c.b || 0}</b> B &middot; <b>${c.nearB || 0}</b> near B &middot; <b>${c.s || 0}</b> S &middot; <b>${c.w || 0}</b> W</span>
-      <details class="picks-why"><summary>how it works</summary><p>The chart's B / S / W rules, run on every ticker from daily closes, so you don't have to open each chart. A <b>trigger</b> is the closing price that would print the next B or S &mdash; set a Moomoo price alert or conditional order there. The best of these now feed <b>Today's Picks</b> above (setups ${rules.minDD || 5}&ndash;${rules.maxDD || 30}% below the 6-month high, above the 200-day, 12-1 momentum rank ${rules.minMom || 60}+). On its own a MACD cross tested close to a coin flip on this universe: the setup is the reason, the B is only the timing. Green-edged chips are setups.</p></details>
+      <details class="picks-why"><summary>how it works</summary><p>The chart's B / S / W rules, run on every ticker from daily closes, so you don't have to open each chart. A <b>trigger</b> is the closing price that would print the next B or S &mdash; set a Moomoo price alert or conditional order there. MACD timing moves checklist names up in <b>Today's Picks</b> above; radar-only setups (${rules.minDD || 5}&ndash;${rules.maxDD || 30}% below the 6-month high, above the 200-day, 12-1 momentum rank ${rules.minMom || 60}+) stay here, because in your backtest they diluted the list. On its own a MACD cross tested close to a coin flip on this universe: the setup is the reason, the B is only the timing. Green-edged chips are setups.</p></details>
     </div>
     ${watchLines ? `<div class="radar-watch">${watchLines}</div>` : '<div class="radar-empty">Nothing happening on your watchlist today.</div>'}
     <div class="radar-lists">${listHtml}</div>`;
@@ -2394,7 +2394,11 @@ function renderMergedPicks(panel, rows){
   rows.forEach(x => { bySym[x.r.sym] = x; });
   const P = picksInfo.picks;
   const soft = !!picksInfo.fallback;
-  const why = `One list, at most ${picksInfo.max || 6}: names that pass the ${P[0] && P[0].gl ? P[0].gl.total : 6}-pillar checklist (${picksInfo.minCount || 4}+ green) and/or are radar setups with MACD timing (a fresh B, or close to the B trigger). Order: both &rarr; fresh B &rarr; checklist only &rarr; near-B only; then 12-1 momentum. Names with a fresh trim warning (W) are left out. Same list as the Telegram brief.`
+  const total = P[0] && P[0].gl ? P[0].gl.total : 6;
+  const why = (picksInfo.mode === 'merged'
+      ? `One list, at most ${picksInfo.max || 6}: names that pass the ${total}-pillar checklist (${picksInfo.minCount || 4}+ green) and/or are radar setups with MACD timing. Order: both &rarr; fresh B &rarr; checklist only &rarr; near-B only; then 12-1 momentum.`
+      : `At most ${picksInfo.max || 6} names that pass the ${total}-pillar checklist (${picksInfo.minCount || 4}+ green). Names that also have MACD timing (a fresh B, or close to the B trigger) come first, then 12-1 momentum. In your backtest, names with both did best and most consistently; radar-only names diluted the list, so they stay in the Signal Radar panel.`)
+    + ' Names with a fresh trim warning (W) are left out. Same list as the Telegram brief.'
     + (soft ? ' Soft day: nothing qualified, so these are today\u2019s top percentile-rank names instead.' : '')
     + ' Whether merging beats the old lists is tested by runPicksBacktest() in Code.gs.';
   panel.style.display = 'block';
@@ -2414,7 +2418,7 @@ function renderMergedPicks(panel, rows){
     const x = bySym[sym], r = x ? x.r : { sym: sym };
     const badge = (soft && p.pctRank != null) ? 'pct. ' + p.pctRank : `${p.gl.count}/${p.gl.total}`;
     let timing = '';
-    if (p.timing) timing = `<div class="pick-timing">${escHtml(p.timing)}</div>`;
+    if (p.timing) timing = `<div class="pick-timing">${escHtml(p.timing)}${p.fragile ? ' <span class="hint" title="The opposite signal is within 0.5% — MACD is almost flat and can flip back">(fragile)</span>' : ''}</div>`;
     else if (p.next === 'B' && p.trig != null) timing = `<div class="pick-timing dim">No B yet &middot; B if it closes &ge; ${fmt(p.trig,2)}${p.trigPct != null ? ` (${p.trigPct > 0 ? '+' : '&minus;'}${Math.abs(p.trigPct).toFixed(1)}%)` : ''}</div>`;
     else if (p.next === 'S' && p.trig != null) timing = `<div class="pick-timing dim">MACD up &middot; S on a close &le; ${fmt(p.trig,2)}</div>`;
     const tags = [p.checklist ? '<span class="badge mom-up">checklist</span>' : '', p.tier ? '<span class="badge sig-b">MACD timing</span>' : ''].filter(Boolean).join('');

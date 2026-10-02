@@ -99,6 +99,10 @@
   details.panel[open] summary { margin-bottom:12px; }
   .method p, .method li { color: var(--ink-dim); font-size: 13.5px; }
   .method code { font-family: var(--mono); background: var(--panel-raised); padding:1px 5px; border-radius:2px; color:var(--ink); font-size:12.5px;}
+  .method h3 { font-size:13px; font-weight:600; color:var(--ink); margin:18px 0 4px; letter-spacing:.02em; }
+  .method ul { margin:4px 0 8px; padding-left:20px; }
+  .method li { margin:3px 0; line-height:1.5; }
+  .text-link { color:var(--brass); text-decoration:underline; cursor:pointer; }
 
   .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom: 14px; }
   select, button, input[type=text] {
@@ -258,6 +262,7 @@
   .picks-why summary::after { content:' \25BE'; }
   .picks-why[open] summary::after { content:' \25B4'; }
   .picks-why p { margin:6px 0 0; font-size:11.5px; line-height:1.45; color:var(--ink-dim); }
+  .picks-track { margin:-2px 0 10px; font-size:11.5px; line-height:1.45; color:var(--ink-dim); }
   .picks-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(156px,1fr)); gap:8px; }
   .pick-card { background:var(--panel-raised); border:1px solid var(--line); border-radius:3px; padding:8px 9px; cursor:pointer; }
   .pick-card:hover { border-color: var(--teal); }
@@ -410,7 +415,7 @@
       </div>
       <div class="header-blurb" id="headerBlurb">
       <div class="byline">Developed by ClaudeAI, Directed by JLooi</div>
-      <div class="sub">Screens a candidate pool of US stocks &mdash; any market cap &mdash; across pullback depth bands (under 5%, 5&ndash;10%, 10&ndash;15%, 15&ndash;30%, 30%+) for renewed upward momentum, maps support/resistance, scores setup quality and the odds of a level test, and surfaces the top matches (use the Limit selector to show 10/20/50/all).</div>
+      <div class="sub">Screens your list of US stocks every day for ones that pulled back and are turning up again. It maps support and resistance (Buy Zone, Stop, Target), runs a 6-point checklist and the chart's MACD signals on every stock, and keeps a short list of Today's Picks, also sent to Telegram each morning with a pre-market update before the US open. Tap any row or pick for its chart and full analysis. See <a class="text-link" role="button" tabindex="0" onclick="openHowToRead()" onkeydown="if(event.key==='Enter')openHowToRead()">How to read this</a> at the bottom. Reference only, not financial advice.</div>
       </div>
     </div>
     <div class="stamp" id="stamp"></div>
@@ -509,14 +514,14 @@
           <th data-key="sym">Symbol</th>
           <th data-key="sector">Sector</th>
           <th data-key="price" title="Current share price">Price</th>
-          <th data-key="buyZoneLow" title="Heuristic reference range for scaling in, built off the nearest of up to 3 trailing-1-year support zones (or the swing low if no zone was found) plus a bit of ATR room above it — not a signal, just a framework. Tap a row for the full multi-zone ladder. See Methodology">Buy Zone</th>
+          <th data-key="buyZoneLow" title="Heuristic reference range for scaling in, built off the nearest of up to 3 trailing-1-year support zones (or the swing low if no zone was found) plus a bit of ATR room above it — not a signal, just a framework. Tap a row for the full multi-zone ladder. See How to read this (bottom of the page)">Buy Zone</th>
           <th data-key="rsi14" title="RSI(14) plus direction: ↑ rising, ↓ falling, → flat vs. ~5 trading days ago. A '50↑' badge means it just crossed back above the midline">RSI</th>
           <th data-key="technicalConfirmationScore" title="Technical Confirmation — EMA stack, ADX/DI, MACD, ROC, Bollinger position, relative volume and price structure">Tech Confirm</th>
-          <th data-key="macdHistogram" title="MACD(12,26,9) histogram">MACD</th>
-          <th data-key="setupQualityScore" title="Heuristic 0-100 Setup Quality score, see Methodology">Setup Quality<br><span style="font-size:9px;font-weight:400;color:var(--up);text-transform:none;">for pullbacks</span></th>
-          <th data-key="trendContinuationScore" title="Trend Continuation — a separate lens from Setup Quality/Test-Support, for uptrends that haven't pulled back: MA trend, ADX/DI, EMA stack, relative strength vs S&P, MACD, price structure. See Methodology">Trend Cont.<br><span style="font-size:9px;font-weight:400;color:var(--brass);text-transform:none;">no pullback yet</span></th>
+          <th data-key="macdHistogram" title="MACD(12,26,9) histogram, plus the radar badges: B / S = MACD turned up / down at the last close (·1d = one session ago, ~ = fragile), W = trim warning, B? / S? = close to the trigger. Hover a cell for its trigger price">MACD</th>
+          <th data-key="setupQualityScore" title="How good the pullback looks, 0-100 (trend, depth, reversal, shape). A rule of thumb: its weighting didn't hold up when tested on a later period, so Today's Picks rank by 12-1 momentum instead. One of the 6 checklist pillars at 70+">Setup Quality<br><span style="font-size:9px;font-weight:400;color:var(--up);text-transform:none;">for pullbacks</span></th>
+          <th data-key="trendContinuationScore" title="Trend Continuation — a separate lens from Setup Quality/Test-Support, for uptrends that haven't pulled back: MA trend, ADX/DI, EMA stack, relative strength vs S&P, MACD, price structure. Held up in testing (top half beat the bottom half by ~1.3 points over 21 days). One of the 6 checklist pillars at 65+">Trend Cont.<br><span style="font-size:9px;font-weight:400;color:var(--brass);text-transform:none;">no pullback yet</span></th>
           <th data-key="currentDrawdownPct" title="How far price is BELOW the 6M high right now — peak to current. This is now the primary pullback measure used for the depth band and default sort">Cur DD %</th>
-          <th data-key="trend" title="20-day trend direction, your read">20D Trend</th>
+          <th data-key="trend" title="20-day trend direction, from the stored prices (editable only on sample or hand-added rows)">20D Trend</th>
           <th data-key="longTermTrend" title="Price vs 50-day and 200-day moving averages — confirms whether the pullback is fighting the longer-term trend or moving with it">MA Trend</th>
           <th data-key="vol" title="Volume trend over the last 2-3 weeks">Volume</th>
           <th data-key="relStrengthPct" title="This stock's 6-month % move minus the S&P 500's (SPY) over the same window — positive means it's outperforming the market, not just following it">vs S&amp;P%</th>
@@ -551,20 +556,59 @@
 
   <div class="panel" id="detailPanel" style="display:none;"></div>
 
-  <details class="panel method">
+  <details class="panel method" id="howToRead">
     <summary>How to read this</summary>
-    <p>This tool looks for stocks that dipped and then started recovering — a "pullback." It's a reference to help you think, not a buy/sell signal, and it's not financial advice.</p>
+    <p>This tool looks for US stocks that dipped and are turning back up (a "pullback"). It is a reference to help you decide, not a buy/sell signal, and not financial advice. Prices are daily closes from Google Finance, about 20 minutes delayed while the market is open. Tap any row or pick to open its chart with the full analysis underneath.</p>
+
+    <h3>Today's Picks</h3>
     <ul>
-      <li><b>Buy Zone</b> — a price range where the stock has found support before. If the price falls back into this range, it may be a reasonable spot to consider buying.</li>
-      <li><b>Stop</b> — if the price falls below this, the idea is probably wrong.</li>
-      <li><b>Target</b> — a reasonable place to expect the price to run into resistance.</li>
-      <li><b>R:R (Reward:Risk)</b> — how much you could gain (to Target) versus how much you're risking (to Stop). Higher is better.</li>
-      <li><b>Setup Quality score (0–100)</b> — for stocks that have actually dipped: how good the pullback looks overall. Higher is better.</li>
-      <li><b>Trend Continuation score (0–100)</b> — for stocks that are just trending up without a real dip. A separate way of looking at a stock, not blended with Setup Quality.</li>
-      <li><b>Test-Support score (0–100)</b> — how close the price is to a real support level right now.</li>
-      <li><b>Colors:</b> green = bullish / good sign, red = bearish / caution, amber = a warning worth noticing, violet = a rough or unconfirmed estimate — treat it with a bit less confidence.</li>
+      <li>At most 5 names that pass at least 4 of the 6 checklist pillars. Names that also have MACD timing (a B at the last close or one session ago, or close to the B trigger) come first, then the strongest 12-1 momentum. A name with a fresh trim warning (W) is left out. The same list goes out in the Telegram brief.</li>
+      <li><b>The 6 pillars:</b> Setup Quality 70+ &middot; Trend Cont. 65+ &middot; Tech Confirm 70+ &middot; Momentum 12-1 in the top 40% &middot; Volume (1.3&times; normal, on buying days) &middot; Entry Timing (inside the Buy Zone, not extended, not stale). It shows what is confirmed; it is not a score. In testing, 5 or 6 green did not do better than 4.</li>
+      <li><b>Soft day:</b> when nothing passes, the list shows today's relative leaders instead, and says so.</li>
+      <li><b>Stretched &mdash; wait 1&ndash;2 days:</b> more than 2 ATR above its 20-day average. Strong names this stretched usually paused for a day or two, then kept going.</li>
+      <li><b>Evidence:</b> in your backtest (94 dates, result 21 trading days later), this list beat the average stock in your universe by about 3.3 points, against 2.7 for the old Top Picks. The rule was chosen on that same data, so the <b>Picks Log</b> tab in your first sheet now records every day's picks and their real 5, 10 and 21-day results ("Live record" line above the cards). Judge it after about 3 months.</li>
     </ul>
-    <p>Tap any row to see the full detail panel — support/resistance levels, the full buy-zone ladder, and every score broken down.</p>
+
+    <h3>Signal Radar and the B / S / W badges</h3>
+    <ul>
+      <li>The chart's signals, checked on every stock each morning so you don't have to open each chart.</li>
+      <li><b>B</b> = MACD turned up, with the DMI lines or the 20-day average agreeing. <b>S</b> = the same, turning down. <b>&middot;1d</b> = one session ago. <b>~</b> = fragile: the opposite signal is within 0.5%, so it can flip back on a small move.</li>
+      <li><b>Trigger</b> = the closing price that would print the next B or S. <b>B?</b> / "near B" = the trigger is within 1 ATR. It only counts on a close, so it suits a price alert in Moomoo.</li>
+      <li><b>W</b> = trim warning: money flow weakening near the highs. On average these stocks then lagged SPY by under 1% over the next month and often still rose: a reason to trim or tighten a stop, not to sell everything.</li>
+      <li>On their own, MACD crosses were close to a coin flip on your stocks. Use them for timing; the setup is the reason to look at a stock.</li>
+    </ul>
+
+    <h3>Main table</h3>
+    <ul>
+      <li><b>Cur DD %</b> &mdash; how far below its 6-month high the stock is now. Sets the depth band (under 5%, 5&ndash;10%, 10&ndash;15%, 15&ndash;30%, 30%+).</li>
+      <li><b>Buy Zone</b> &mdash; a price range built from the nearest support level of the past year. <b>Stop</b> sits just below it: below there, the idea is probably wrong. <b>Target</b> is the next resistance above. <b>R:R</b> = reward to Target &divide; risk to Stop. Tags: <i>uncertain</i> = only one test of the level; <i>former resistance</i>; <i>recent, unconfirmed</i>; <i>stale Nd</i> = parked in the zone N days without moving away.</li>
+      <li><b>Setup Quality</b> (0&ndash;100) &mdash; how good the pullback looks (trend, depth, reversal, shape). A rule of thumb: its weighting did not hold up when tested on a later period, so the picks are ranked by momentum instead.</li>
+      <li><b>Trend Cont.</b> (0&ndash;100) &mdash; for uptrends that haven't dipped yet. This one held up in testing: the top half beat the bottom half by about 1.3 points over 21 days, steadily across the period.</li>
+      <li><b>Tech Confirm</b> (0&ndash;100) &mdash; moving-average stack, ADX/DI, MACD, rate of change, Bollinger position, relative volume and price structure.</li>
+      <li><b>Mom 12-1</b> &mdash; the return from 12 months ago to 1 month ago, ranked against today's universe (99 = strongest). The one indicator that kept an edge in testing: about +0.6 points per 21 days against stocks of similar volatility. A modest tilt that pays over many trades, not a forecast for one stock.</li>
+      <li><b>Volatility</b> &mdash; how jumpy the stock is (99 = jumpiest). Not a signal; it explains why some stocks move a lot.</li>
+      <li><b>vs S&amp;P%</b> &mdash; the stock's 6-month return minus SPY's. <b>MACD</b> &mdash; the histogram plus the radar badges above.</li>
+      <li><b>Risk</b> &mdash; chasing risk (how far price sits above the Buy Zone, in ATR) and, for 30%+ pullbacks, how many reversal signs are confirmed. Few or none means a falling-knife warning.</li>
+      <li><b>Test-support score</b> (detail panel) &mdash; how close the price is to a real support level right now.</li>
+    </ul>
+
+    <h3>Before the US open</h3>
+    <ul>
+      <li>The top panel shows pre-market prices fetched by your Apps Script from Alpaca (15 minutes delayed; "IEX only" on the free feed) or from the Moomoo bridge if it is running. "Risk-on lean" means SPY and most of your stocks are up together: one snapshot, not a forecast.</li>
+      <li>Without that feed the panel says so: Google Finance has no pre-market prices, so any "gap" would just be yesterday's close.</li>
+    </ul>
+
+    <h3>Signal chart</h3>
+    <ul>
+      <li>Candles with the 10, 20 and 50-day averages and the 200-day line, trendlines, support/resistance zones, gaps (FVG), the B / S / W markers and a dashed line at the next trigger. Opening a chart also opens the pullback analysis below it.</li>
+    </ul>
+
+    <h3>Telegram</h3>
+    <ul>
+      <li>The morning brief comes after the daily price refresh (around 7:30&ndash;8am Malaysia time, backup at 9:15): Today's Picks, your watchlist, the after-hours move and the Live record line. A pre-market update follows at 8:45am New York time (8:45pm Malaysia time; 9:45pm from early November to mid-March).</li>
+    </ul>
+
+    <p><b>Colors:</b> green = good sign, red = caution, amber = worth noticing, violet = a rough or unconfirmed estimate.</p>
   </details>
 
 </div>
@@ -816,10 +860,9 @@ function renderMarketSnapshot(){
 
 // --- Signal Radar panel ------------------------------------------------------
 // The chart's B / S / W rules, run by the backend over EVERY ticker on its
-// stored daily closes (see SIGNAL RADAR in Code.gs). The top cards are the
-// same list the Telegram morning brief sends: setups (5-30% below the 6-month
-// high, above the 200-day, 12-1 momentum rank 60+) that just printed a B or
-// are close to their B trigger. The lists underneath show every fresh signal.
+// stored daily closes (see SIGNAL RADAR in Code.gs). The radar no longer has
+// its own cards: MACD timing feeds Today's Picks (the list the Telegram brief
+// sends). This panel shows your watchlist's signals and every fresh signal.
 function radarBadge(r){
   const rd = r.radar;
   if (!rd) return r.macdCrossUp ? '<span class="badge mom-up">cross</span>' : '';
@@ -883,7 +926,7 @@ function renderRadar(){
     <div class="radar-head">
       <h2>Signal Radar</h2>
       <span class="radar-counts">since the last close: <b>${c.b || 0}</b> B &middot; <b>${c.nearB || 0}</b> near B &middot; <b>${c.s || 0}</b> S &middot; <b>${c.w || 0}</b> W</span>
-      <details class="picks-why"><summary>how it works</summary><p>The chart's B / S / W rules, run on every ticker from daily closes, so you don't have to open each chart. A <b>trigger</b> is the closing price that would print the next B or S &mdash; set a Moomoo price alert or conditional order there. MACD timing moves checklist names up in <b>Today's Picks</b> above; radar-only setups (${rules.minDD || 5}&ndash;${rules.maxDD || 30}% below the 6-month high, above the 200-day, 12-1 momentum rank ${rules.minMom || 60}+) stay here, because in your backtest they diluted the list. On its own a MACD cross tested close to a coin flip on this universe: the setup is the reason, the B is only the timing. Green-edged chips are setups.</p></details>
+      <details class="picks-why"><summary>how it works</summary><p>The chart's B / S / W rules, run on every ticker from daily closes, so you don't have to open each chart. A <b>trigger</b> is the closing price that would print the next B or S &mdash; set a Moomoo price alert or conditional order there. MACD timing moves checklist names up in <b>Today's Picks</b> above; radar-only setups (${rules.minDD || 5}&ndash;${rules.maxDD || 30}% below the 6-month high, above the 200-day, 12-1 momentum rank ${rules.minMom || 60}+) stay here, because in your backtest they diluted the list. On its own a MACD cross tested close to a coin flip on this universe: the setup is the reason, the B is only the timing. Green-edged chips are setups. A <b>~</b> after B or S means fragile: the opposite trigger is within 0.5%, so it can flip back on a small move.</p></details>
     </div>
     ${watchLines ? `<div class="radar-watch">${watchLines}</div>` : '<div class="radar-empty">Nothing happening on your watchlist today.</div>'}
     <div class="radar-lists">${listHtml}</div>`;
@@ -1263,7 +1306,7 @@ async function fetchAllLive(){
     const pending = json.pending_history_backfill || 0;
     if (pending > 0) {
       const symList = (json.pending_history_symbols || []).join(', ');
-      msg += ` ⏳ ${pending} ticker${pending===1?'':'s'} still building 3-year history in the background`;
+      msg += ` ⏳ ${pending} ticker${pending===1?'':'s'} still building 5-year history in the background`;
       if (symList) msg += ` (${symList})`;
       msg += ` — run startHistoryBackfill() once from the Apps Script editor if this list isn't shrinking, then check back in a few minutes.`;
     }
@@ -1305,8 +1348,8 @@ function computeRow(r){
     deepestZoneStop:null, deepestZoneCount:0
   };
   // Max Pullback % (peak -> trough), Current Drawdown % (peak -> current), and
-  // Off Low / recovery % (trough -> current) are three separate numbers — see
-  // Methodology. Derived locally so manually-edited rows and live-fetched
+  // Off Low / recovery % (trough -> current) are three separate numbers (all
+  // three are in the detail panel). Derived locally so manually-edited rows and live-fetched
   // rows compute identically, rather than trusting a backend field that a
   // hand-edit could make stale.
   if (high !== null && swing !== null && high > 0){
@@ -1805,8 +1848,8 @@ function analogueDetail(a, kind){
     ? `<div class="hint">Only ${a.n} matching setup${a.n===1?'':'s'} found across today's loaded universe &mdash; too few to treat as a statistic (need 15+).</div>`
     : `<div class="hint">Only ${a.n} past analogue${a.n===1?'':'s'} found on this ticker's own history &mdash; too few to treat as a statistic (need 5+).</div>`;
   const footer = isPooled
-    ? 'Pooled across every ticker in today\'s loaded universe that hit this same pullback band + trend at some point in its own history, not just this one ticker &mdash; a larger, more real backtest sample than the self-referential version below, but still only as broad as your loaded ticker list, and still a coarse band+trend match (no RSI/RS/volume). See Methodology.'
-    : 'Self-referential: past points on THIS ticker\'s own ~3-year history with the same pullback band + trend as today &mdash; the pooled cross-ticker version above is the more real backtest. See Methodology.';
+    ? 'Pooled across every ticker in today\'s loaded universe that hit this same pullback band + trend at some point in its own history, not just this one ticker &mdash; a larger, more real backtest sample than the self-referential version below, but still only as broad as your loaded ticker list, and still a coarse band+trend match (no RSI/RS/volume). It feeds no score or pick: context only.'
+    : 'Self-referential: past points on THIS ticker\'s own ~5-year history with the same pullback band + trend as today &mdash; the pooled cross-ticker version above is the more real backtest. Context only.';
   return `
     <div class="detail-grid" style="margin-top:6px;">
       <div><div class="k">N (past occurrences)</div><div class="v">${a.n}</div></div>
@@ -1987,7 +2030,7 @@ function paginateAndRender(rows, signature){
 // green-light count without adding independent evidence. This version
 // keeps the three composite scores the tool already maintains separately
 // (Setup Quality, Trend Continuation, Tech Confirm — deliberately NOT
-// blended together elsewhere, see Methodology) as three pillars, and folds
+// blended together elsewhere) as three pillars, and folds
 // the remaining raw signals into three merged pillars instead of six
 // separate votes: Momentum (12-1 momentum rank; was MACD + RSI), Volume (relative volume +
 // accumulation), and Entry Timing (in the Buy Zone, not extended, not
@@ -2395,12 +2438,22 @@ function renderMergedPicks(panel, rows){
   const P = picksInfo.picks;
   const soft = !!picksInfo.fallback;
   const total = P[0] && P[0].gl ? P[0].gl.total : 6;
-  const why = (picksInfo.mode === 'merged'
-      ? `One list, at most ${picksInfo.max || 6}: names that pass the ${total}-pillar checklist (${picksInfo.minCount || 4}+ green) and/or are radar setups with MACD timing. Order: both &rarr; fresh B &rarr; checklist only &rarr; near-B only; then 12-1 momentum.`
-      : `At most ${picksInfo.max || 6} names that pass the ${total}-pillar checklist (${picksInfo.minCount || 4}+ green). Names that also have MACD timing (a fresh B, or close to the B trigger) come first, then 12-1 momentum. In your backtest, names with both did best and most consistently; radar-only names diluted the list, so they stay in the Signal Radar panel.`)
+  const max = picksInfo.max || 5, minC = picksInfo.minCount || 4;
+  const timedRule = !picksInfo.mode || picksInfo.mode === 'timed';
+  const ruleText = {
+    merged: `One list, at most ${max}: names that pass the ${total}-pillar checklist (${minC}+ green) and/or are radar setups with MACD timing. Order: both &rarr; fresh B &rarr; checklist only &rarr; near-B only; then 12-1 momentum.`,
+    toppicks: `The old Top Picks rule: at most ${max} names, ranked by how many of the ${total} pillars are green, then 12-1 momentum.`,
+    radar: `Radar setups only: pullback names with a fresh B or close to the B trigger, ranked by 12-1 momentum.`
+  }[picksInfo.mode] || `At most ${max} names that pass the ${total}-pillar checklist (${minC}+ green). Names that also have MACD timing (a fresh B, or close to the B trigger) come first, then the strongest 12-1 momentum.`;
+  const why = ruleText
     + ' Names with a fresh trim warning (W) are left out. Same list as the Telegram brief.'
     + (soft ? ' Soft day: nothing qualified, so these are today\u2019s top percentile-rank names instead.' : '')
-    + ' Whether merging beats the old lists is tested by runPicksBacktest() in Code.gs.';
+    + (timedRule
+      ? ' In your backtest this rule beat the old Top Picks in both halves of the period (about +3.3 vs +2.7 points over 21 days, against the average stock), but it was chosen on that same data. The Picks Log tab in your first sheet keeps the live record.'
+      : ' The Picks Log tab in your first sheet keeps the live record of every day\u2019s picks.');
+  const track = (picksInfo.track && picksInfo.track.text)
+    ? `<div class="picks-track" title="From the Picks Log tab in your first sheet: each morning's picks and how they did 5, 10 and 21 US sessions later, vs SPY and vs the average stock in your universe.">Live record: ${escHtml(picksInfo.track.text)}</div>`
+    : '';
   panel.style.display = 'block';
   const head = `
     <div class="picks-head">
@@ -2410,10 +2463,10 @@ function renderMergedPicks(panel, rows){
       ${Object.keys(catalystState.data).length ? `<button class="cat-btn" id="catCopyBtn" onclick="copyCatalystBrief()" title="Copy every headline found, with the drawdown context, formatted as a question you can paste straight into Claude or ChatGPT.">Copy for AI</button>` : ''}
     </div>`;
   if (!P.length){
-    panel.innerHTML = head + '<div class="hint">Nothing cleared the checklist or turned on MACD today &mdash; no picks.</div>';
+    panel.innerHTML = head + track + '<div class="hint">Nothing cleared the checklist or turned on MACD today &mdash; no picks.</div>';
     return;
   }
-  panel.innerHTML = head + `<div class="picks-grid">${P.map(p => {
+  panel.innerHTML = head + track + `<div class="picks-grid">${P.map(p => {
     const sym = safeSym(p.sym);
     const x = bySym[sym], r = x ? x.r : { sym: sym };
     const badge = (soft && p.pctRank != null) ? 'pct. ' + p.pctRank : `${p.gl.count}/${p.gl.total}`;
@@ -2671,6 +2724,12 @@ function openDetail(sym, silent){
 }
 
 // --- Header blurb --------------------------------------------------------
+function openHowToRead(){
+  const d = document.getElementById('howToRead');
+  if (!d) return;
+  d.open = true;
+  d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 function toggleBlurb(){
   const blurb = document.getElementById('headerBlurb');
   const btn = document.getElementById('blurbToggle');

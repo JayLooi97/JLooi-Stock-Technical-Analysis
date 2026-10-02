@@ -326,6 +326,11 @@
   .badge.sig-s { color:var(--down); border:1px solid var(--down); }
   .badge.sig-w { color:var(--amber); border:1px solid var(--amber); }
   .badge.sig-near { color:var(--steel); border:1px dashed var(--steel); }
+  .pick-timing { font-size:11px; line-height:1.35; margin:0 0 5px; color:var(--up); }
+  .pick-timing.dim { color:var(--ink-dim); }
+  .pick-tags { display:flex; gap:4px; flex-wrap:wrap; margin:2px 0 4px; }
+  .pick-tags .badge { font-size:9.5px; }
+  .sig-jump { margin-left:6px; }
 
   /* Pre/after-market board, fed by the Moomoo bridge */
   .pm-board { display:flex; flex-direction:column; gap:5px; width:100%; }
@@ -423,9 +428,9 @@
 
   <div class="panel" id="alertPanel" style="display:none;"></div>
 
-  <div class="panel" id="radarPanel" style="display:none;"></div>
-
   <div class="panel" id="dailyPicksPanel" style="display:none;"></div>
+
+  <div class="panel" id="radarPanel" style="display:none;"></div>
 
   <div class="panel controls">
     <button class="primary" onclick="fetchAllLive()" id="liveBtn">Fetch live data (Google Sheet)</button>
@@ -648,7 +653,7 @@ function loadSample(){
   ];
   selected = null;
   marketSnapshot = null; // sample data has no real SPY quote behind it
-  radarInfo = null; premarketInfo = null;
+  radarInfo = null; premarketInfo = null; picksInfo = null;
   catalystState.data = {};
   renderMarketSnapshot();
   render();
@@ -657,7 +662,7 @@ function clearAll(){
   data = [];
   selected = null;
   marketSnapshot = null;
-  radarInfo = null; premarketInfo = null;
+  radarInfo = null; premarketInfo = null; picksInfo = null;
   catalystState.data = {};
   renderMarketSnapshot();
   render();
@@ -677,6 +682,7 @@ function clearAll(){
 let marketSnapshot = null;
 let premarketInfo = null;   // payload.premarket — posted by the Moomoo bridge
 let radarInfo = null;       // payload.radar — Signal Radar summary
+let picksInfo = null;       // payload.picks — the merged Today's Picks (backend decides, same list as Telegram)
 
 const MARKET_GAP_THRESHOLD_PCT = 0.15; // below this magnitude reads as flat/mixed
 const PREMARKET_MAX_AGE_H = 6;         // older bridge boards aren't shown
@@ -716,12 +722,13 @@ function renderPremarketBoard(panel, pm, ageH){
   const upShare = b.n ? Math.round((b.up || 0) / Math.max(1, (b.up || 0) + (b.down || 0)) * 100) : null;
   const watch = ((radarInfo && radarInfo.watch) || []).map(s => chip(s, 1)).filter(Boolean).join('');
   const movers = (arr) => (arr || []).slice(0, 6).map(r => { const sym = safeSym(r.s); return sym ? `<span class="pm-chip" onclick="openSignal('${sym}')"><b>${sym}</b><span class="${r.pc > 0 ? 'pm-up' : 'pm-down'}">${pmPct(r.pc, 1)}</span></span>` : ''; }).join('');
-  const picks = ((radarInfo && radarInfo.picks) || []).map(p => {
+  const picks = ((picksInfo && picksInfo.picks) || (radarInfo && radarInfo.picks) || []).map(p => {
     const sym = safeSym(p.sym); const r = by[sym]; const x = r ? pmExtOf(r, pm.session) : null;
     if (!sym || !x) return '';
     let note;
     if (p.next === 'B') note = x.price >= p.trig ? `<span class="pm-up">&ge; B trigger ${fmt(p.trig,2)}</span>` : `<span class="pm-dim">needs ${pmPct((p.trig / x.price - 1) * 100, 1)} to B ${fmt(p.trig,2)}</span>`;
-    else note = `<span class="${x.price >= p.close ? 'pm-up' : 'pm-down'}">${pmPct((x.price / p.close - 1) * 100, 1)} vs B close</span>`;
+    else if (p.close) note = `<span class="${x.price >= p.close ? 'pm-up' : 'pm-down'}">${pmPct((x.price / p.close - 1) * 100, 1)} vs ${p.sig === 'B' ? 'B' : 'last'} close</span>`;
+    else note = '';
     return `<span class="pm-chip" onclick="openSignal('${sym}')"><b>${sym}</b>${fmt(x.price,2)} ${note}</span>`;
   }).filter(Boolean).join('');
   const mins = Math.max(0, Math.round(ageH * 60));
@@ -736,17 +743,17 @@ function renderPremarketBoard(panel, pm, ageH){
   panel.innerHTML = `
     <div class="pm-board">
       <div class="pm-row">
-        <span class="mkt-label">${label} &middot; Moomoo</span>
+        <span class="mkt-label">${label} &middot; ${pm.source === 'alpaca' ? (pm.feed === 'iex' ? 'IEX only' : '15-min delayed') : 'Moomoo'}</span>
         ${spy ? `<span class="mkt-gap ${dir === 'bull' ? 'up' : dir === 'bear' ? 'down' : ''}">SPY ${pmPct(spy.pct)}</span>` : ''}
         <span class="mkt-read">${read}${upShare != null ? ` &middot; ${upShare}% of your universe up` : ''} &mdash; one snapshot, not a forecast</span>
-        <span class="mkt-detail" title="Posted by your Moomoo bridge at ${escHtml(new Date(pm.received_at).toLocaleString())}">${escHtml(pm.et_time || '')} ET &middot; ${age}</span>
+        <span class="mkt-detail" title="${pm.source === 'alpaca' ? 'Fetched from Alpaca by your Apps Script' + (pm.feed === 'iex' ? ' (IEX: one exchange, so thin stocks may show nothing)' : ' (whole market, 15 minutes delayed)') : 'Posted by your Moomoo bridge'} at ${escHtml(new Date(pm.received_at).toLocaleString())}">${escHtml(pm.et_time || '')} ET &middot; ${age}</span>
       </div>
       <div class="pm-row"><span class="k">Market</span>${PM_BOARD.map(s => chip(s, 2)).join('') || '<span class="pm-dim">no extended-hours trades yet</span>'}</div>
       ${b.n ? `<div class="pm-row"><span class="k">Breadth</span><span>${b.up || 0} up / ${b.down || 0} down &middot; median ${pmPct(b.median)}</span></div>` : ''}
       ${watch ? `<div class="pm-row"><span class="k">Watchlist</span>${watch}</div>` : ''}
       ${pm.movers && pm.movers.up && pm.movers.up.length ? `<div class="pm-row"><span class="k">Gap up</span>${movers(pm.movers.up)}</div>` : ''}
       ${pm.movers && pm.movers.down && pm.movers.down.length ? `<div class="pm-row"><span class="k">Gap down</span>${movers(pm.movers.down)}</div>` : ''}
-      ${picks ? `<div class="pm-row"><span class="k">Radar picks</span>${picks}</div>` : ''}
+      ${picks ? `<div class="pm-row"><span class="k">Today's picks</span>${picks}</div>` : ''}
     </div>`;
 }
 
@@ -772,7 +779,7 @@ function renderMarketSnapshot(){
     panel.innerHTML = `
       <span class="mkt-label">Before the open</span>
       <span class="mkt-gap">&mdash;</span>
-      <span class="mkt-read">No pre-market feed: Google Finance only has regular-session prices, so this is yesterday&rsquo;s close. Run the Moomoo bridge for real pre-market numbers.</span>
+      <span class="mkt-read">No pre-market feed yet: Google Finance only has regular-session prices, so this is yesterday&rsquo;s close. Set up the Alpaca feed (setupPremarketFeed in Code.gs) for real pre-market numbers.</span>
       <span class="mkt-detail">SPY prev close ${fmt(prev_close,2)}${openMyt ? ` &middot; US open ${openMyt} MYT` : ''}</span>`;
     return;
   }
@@ -857,21 +864,7 @@ function renderRadar(){
       ${L.items.length > MAX_CHIPS ? `<span class="hint">+${L.items.length - MAX_CHIPS} more &mdash; use Show: fresh signals</span>` : ''}</div>
     </details>`).join('');
 
-  const picks = ri.picks || [];
-  const cards = picks.map(p => {
-    const sym = safeSym(p.sym);
-    const meta = [];
-    if (p.dd != null) meta.push(`pullback ${fmt(p.dd,1)}%`);
-    if (p.mom != null) meta.push(`mom ${p.mom}`);
-    if (p.zoneLow != null) meta.push(`support ${fmt(p.zoneLow,2)}${p.zoneHigh != null && p.zoneHigh !== p.zoneLow ? '&ndash;' + fmt(p.zoneHigh,2) : ''}`);
-    if (p.next === 'S' && p.trig != null) meta.push(`fails (S) on a close &le; ${fmt(p.trig,2)}`);
-    return `<div class="radar-card t${p.tier}" onclick="openSignal('${sym}')">
-      <div class="rc-top"><span class="rc-sym">${sym}</span><span class="rc-px">${fmt(num(p.price),2)}</span></div>
-      <div class="rc-what">${escHtml(p.what || '')}</div>
-      <div class="rc-meta">${meta.join(' &middot; ')}</div>
-    </div>`;
-  }).join('');
-
+  const picks = (picksInfo && picksInfo.picks) || [];
   // Watchlist / holdings with something happening
   const held = new Set(ri.held || []);
   const watchLines = (ri.watch || []).map(s => {
@@ -890,10 +883,9 @@ function renderRadar(){
     <div class="radar-head">
       <h2>Signal Radar</h2>
       <span class="radar-counts">since the last close: <b>${c.b || 0}</b> B &middot; <b>${c.nearB || 0}</b> near B &middot; <b>${c.s || 0}</b> S &middot; <b>${c.w || 0}</b> W</span>
-      <details class="picks-why"><summary>how it works</summary><p>The chart's B / S / W rules, run on every ticker from daily closes, so you don't have to open each chart. A <b>trigger</b> is the closing price that would print the next B or S &mdash; set a Moomoo price alert or conditional order there. Cards = setups (${rules.minDD || 5}&ndash;${rules.maxDD || 30}% below the 6-month high, above the 200-day, 12-1 momentum rank ${rules.minMom || 60}+) that just printed a B or sit near their B trigger; max ${rules.maxPicks || 5}, same list as the Telegram brief. On its own a MACD cross tested close to a coin flip on this universe: the setup is the reason, the B is only the timing. Green-edged chips are setups.</p></details>
+      <details class="picks-why"><summary>how it works</summary><p>The chart's B / S / W rules, run on every ticker from daily closes, so you don't have to open each chart. A <b>trigger</b> is the closing price that would print the next B or S &mdash; set a Moomoo price alert or conditional order there. The best of these now feed <b>Today's Picks</b> above (setups ${rules.minDD || 5}&ndash;${rules.maxDD || 30}% below the 6-month high, above the 200-day, 12-1 momentum rank ${rules.minMom || 60}+). On its own a MACD cross tested close to a coin flip on this universe: the setup is the reason, the B is only the timing. Green-edged chips are setups.</p></details>
     </div>
-    ${cards ? `<div class="radar-grid">${cards}</div>` : `<div class="radar-empty">No setup turned on MACD today (${c.setups || 0} names qualify as setups). The lists below still show every fresh signal.</div>`}
-    ${watchLines ? `<div class="radar-watch">${watchLines}</div>` : ''}
+    ${watchLines ? `<div class="radar-watch">${watchLines}</div>` : '<div class="radar-empty">Nothing happening on your watchlist today.</div>'}
     <div class="radar-lists">${listHtml}</div>`;
 }
 
@@ -1258,6 +1250,7 @@ async function fetchAllLive(){
     }));
     marketSnapshot = json.market_snapshot || null;
     radarInfo = json.radar || null;
+    picksInfo = json.picks || null;
     premarketInfo = json.premarket || null;
     renderMarketSnapshot();
     render();
@@ -2297,6 +2290,10 @@ function startAlertTape(panel){
 function renderDailyPicks(rows){
   const panel = document.getElementById('dailyPicksPanel');
   if (!panel) return;
+  // A current backend sends ONE merged list (checklist picks + radar timing),
+  // the same names the Telegram brief sends. The local rule below is only
+  // used for sample/manual rows or an older backend.
+  if (picksInfo && Array.isArray(picksInfo.picks) && !picksInfo.error){ renderMergedPicks(panel, rows); return; }
   const scored = rows
     .map(({r,c}) => ({ r, c, gl: greenLightChecklist(r,c) }))
     .filter(x => num(x.r.price)!=null && x.c.setupQualityScore!=null);
@@ -2390,6 +2387,49 @@ function renderDailyPicks(rows){
       `).join('')}
     </div>
   `;
+}
+
+function renderMergedPicks(panel, rows){
+  const bySym = {};
+  rows.forEach(x => { bySym[x.r.sym] = x; });
+  const P = picksInfo.picks;
+  const soft = !!picksInfo.fallback;
+  const why = `One list, at most ${picksInfo.max || 6}: names that pass the ${P[0] && P[0].gl ? P[0].gl.total : 6}-pillar checklist (${picksInfo.minCount || 4}+ green) and/or are radar setups with MACD timing (a fresh B, or close to the B trigger). Order: both &rarr; fresh B &rarr; checklist only &rarr; near-B only; then 12-1 momentum. Names with a fresh trim warning (W) are left out. Same list as the Telegram brief.`
+    + (soft ? ' Soft day: nothing qualified, so these are today\u2019s top percentile-rank names instead.' : '')
+    + ' Whether merging beats the old lists is tested by runPicksBacktest() in Code.gs.';
+  panel.style.display = 'block';
+  const head = `
+    <div class="picks-head">
+      <h2>Today's Picks</h2>
+      <details class="picks-why"><summary>${soft ? 'soft day &mdash; why' : `${P.length} pick${P.length === 1 ? '' : 's'} &mdash; how`}</summary><p>${why}</p></details>
+      ${P.length ? `<button class="cat-btn" id="catBtn" onclick="checkCatalysts()" title="Fetch the last ${CATALYST_LOOKBACK_DAYS} days of headlines for these names. Advisory context only — it never changes any score or the ranking.">${catalystState.loading ? 'Checking&hellip;' : 'Check news'}</button>` : ''}
+      ${Object.keys(catalystState.data).length ? `<button class="cat-btn" id="catCopyBtn" onclick="copyCatalystBrief()" title="Copy every headline found, with the drawdown context, formatted as a question you can paste straight into Claude or ChatGPT.">Copy for AI</button>` : ''}
+    </div>`;
+  if (!P.length){
+    panel.innerHTML = head + '<div class="hint">Nothing cleared the checklist or turned on MACD today &mdash; no picks.</div>';
+    return;
+  }
+  panel.innerHTML = head + `<div class="picks-grid">${P.map(p => {
+    const sym = safeSym(p.sym);
+    const x = bySym[sym], r = x ? x.r : { sym: sym };
+    const badge = (soft && p.pctRank != null) ? 'pct. ' + p.pctRank : `${p.gl.count}/${p.gl.total}`;
+    let timing = '';
+    if (p.timing) timing = `<div class="pick-timing">${escHtml(p.timing)}</div>`;
+    else if (p.next === 'B' && p.trig != null) timing = `<div class="pick-timing dim">No B yet &middot; B if it closes &ge; ${fmt(p.trig,2)}${p.trigPct != null ? ` (${p.trigPct > 0 ? '+' : '&minus;'}${Math.abs(p.trigPct).toFixed(1)}%)` : ''}</div>`;
+    else if (p.next === 'S' && p.trig != null) timing = `<div class="pick-timing dim">MACD up &middot; S on a close &le; ${fmt(p.trig,2)}</div>`;
+    const tags = [p.checklist ? '<span class="badge mom-up">checklist</span>' : '', p.tier ? '<span class="badge sig-b">MACD timing</span>' : ''].filter(Boolean).join('');
+    return `
+      <div class="pick-card" onclick="openDetail('${sym}')">
+        <div class="pick-top"><span class="pick-sym">${sym}</span><span class="badge mom-up">${badge}</span></div>
+        ${tags ? `<div class="pick-tags">${tags}</div>` : ''}
+        ${timing}
+        <div class="pick-meta">${r.sector || '&mdash;'} &middot; ${fmt(num(r.price),2)} &middot; ${fmtMarketCap(r.marketCap)}</div>
+        <div class="pick-meta">Mom 12-1 ${fmtMom(r.momPercentile, r.mom12_1Pct)} &middot; Vol ${fmtVol(r.volPercentile, r.vol3mPct)}</div>
+        <div class="pick-meta">Rel. volume ${r.relativeVolume20 != null ? fmt(r.relativeVolume20,1) + '&times;' : '&mdash;'}${r.stretch20ATR != null && r.stretch20ATR > 2 ? ` &middot; <span class="badge" style="border:1px solid var(--amber);color:var(--amber);" title="${fmt(r.stretch20ATR,1)} ATR above its 20-day average. In the replay, strong names this stretched dipped slightly over the next 1-2 days, then kept outperforming by 21 days: a reason to wait for a small pullback, not to skip it">Stretched &mdash; wait 1&ndash;2 days</span>` : ''}</div>
+        <div class="pick-pillars">${(p.gl.items || []).map(i => `<span class="${i.pass ? 'on' : 'off'}" title="${escHtml(i.label)}">${i.pass ? '&#9679;' : '&#9675;'} ${escHtml(i.label)}</span>`).join('')}</div>
+        ${catalystLine(sym)}
+      </div>`;
+  }).join('')}</div>`;
 }
 
 function render(){
@@ -2814,6 +2854,9 @@ async function openSignal(sym){
     if (!json.bars) throw new Error('your backend doesn\u2019t have the signal feature yet. Paste in the new Code.gs and redeploy it as a new version.');
     SIG.data = json; SIG.loadedAt = Date.now();
     sigRender();
+    // The pullback analysis for the same ticker opens with the chart (below
+    // it), so one tap shows both. Only possible for tickers in the loaded screen.
+    if (data.some(d => d.sym === sym) && !(selected === sym && sigEl('detailPanel').style.display !== 'none')) openDetail(sym, true);
   } catch (err) {
     if (SIG.pending && SIG.pending !== sym) return;
     const st = sigEl('sigStatus');
@@ -2834,6 +2877,7 @@ function sigRender(){
       <span class="sig-px">${sigFmt(s.price)}</span>
       <span class="sig-chg ${up ? 'sig-up' : 'sig-down'}">${sign}${sigFmt(s.change)} (${sign}${sigFmt(s.changePct)}%)</span>
       <span class="hint">Daily &middot; ${sigEsc(d.asOf)}</span>
+      ${data.some(x => x.sym === d.ticker) ? `<button class="sig-jump" onclick="document.getElementById('detailPanel').scrollIntoView({behavior:'smooth',block:'start'})" title="Pullback analysis for this ticker, just below the chart">Pullback analysis &darr;</button>` : `<span class="hint" title="The pullback analysis needs the screen data">Tap &ldquo;Fetch live data&rdquo; for its pullback analysis</span>`}
       <button class="sig-close" onclick="closeSignal()">&times; Close</button>
     </div>
     <div class="sig-verdict">

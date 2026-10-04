@@ -272,20 +272,28 @@
   /* Position size: inputs above the cards, one line per card. */
   .pick-sizing { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin:-2px 0 10px; font-size:11.5px; color:var(--ink-dim); }
   .pick-sizing .k { font-family:var(--mono); font-size:10px; letter-spacing:.5px; text-transform:uppercase; color:var(--steel); }
-  .pick-sizing label { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
-  .pick-sizing input { width:92px; padding:3px 6px; font-size:12.5px; font-family:var(--mono); background:var(--panel-raised);
-                       color:var(--ink); border:1px solid var(--line); border-radius:3px; }
-  .pick-sizing input#szRisk { width:58px; }
+  .pick-sizing .sz-field { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+  /* A plain text box (no up/down arrows) joined to a ▾ button that opens a list
+     of common values: a scroll wheel on iPhone, a list on Android, a menu on a computer. */
+  .sz-combo { display:inline-flex; align-items:stretch; }
+  .pick-sizing input { width:96px; padding:3px 6px; font-size:12.5px; font-family:var(--mono); background:var(--panel-raised);
+                       color:var(--ink); border:1px solid var(--line); border-radius:3px 0 0 3px; margin:0; }
+  .pick-sizing input#szRisk { width:44px; }
   .pick-sizing input:focus { border-color:var(--teal); outline:none; }
-  @media (max-width: 700px){ .pick-sizing input { font-size:16px; } }   /* 16px: phones don't zoom in on focus */
+  .pick-sizing input.bad { border-color:var(--down); }
+  .sz-pick { position:relative; display:inline-flex; align-items:center; justify-content:center; width:22px;
+             border:1px solid var(--line); border-left:none; border-radius:0 3px 3px 0; background:var(--panel-raised);
+             color:var(--ink-dim); font-size:10px; cursor:pointer; }
+  .sz-pick:hover, .sz-pick:focus-within { color:var(--teal); border-color:var(--teal); }
+  .sz-pick select { position:absolute; inset:0; width:100%; height:100%; margin:0; padding:0; border:0; opacity:0;
+                    cursor:pointer; font-size:16px; -webkit-appearance:none; appearance:none; }
+  @media (max-width: 700px){                                       /* 16px: phones don't zoom in on focus */
+    .pick-sizing input { font-size:16px; width:104px; }
+    .pick-sizing input#szRisk { width:52px; }
+    .sz-pick { width:34px; font-size:12px; }
+  }
   .pick-size { font-size:11px; line-height:1.35; margin:0 0 5px; color:var(--ink); }
   .pick-size .hint { font-size:10.5px; }
-  /* Chart pattern tags (violet = being tested; green once your backtest shows an edge). */
-  .badge.pat { color:var(--violet); border:1px solid var(--violet-dim); }
-  .badge.pat.ok { color:var(--up); border-color:var(--up); }
-  .badge.pat.dim { opacity:.6; }
-  .pat-list { font-size:13px; line-height:1.55; font-family:var(--serif); }
-  .pat-list .hint { font-size:12px; }
   .picks-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(156px,1fr)); gap:8px; }
   .pick-card { background:var(--panel-raised); border:1px solid var(--line); border-radius:3px; padding:8px 9px; cursor:pointer; }
   .pick-card:hover { border-color: var(--teal); }
@@ -476,7 +484,6 @@
       <option value="setup">Show: pullback + momentum turning up</option>
       <option value="trendcont">Show: trend continuation (no pullback needed)</option>
       <option value="signals">Show: fresh signals (B / S / W, near B)</option>
-      <option value="patterns">Show: chart patterns (tags, being tested)</option>
     </select>
     <select id="limitMode" onchange="render()" title="Caps how many rows are shown for the 'Show' selection above, so you don't have to keep scrolling/paging through everything">
       <option value="all">Limit: show all</option>
@@ -589,27 +596,20 @@
       <li>At most 5 names that pass at least 4 of the 6 checklist pillars. Names that also have MACD timing (a B at the last close or one session ago, or close to the B trigger) come first, then the strongest 12-1 momentum. A name with a fresh trim warning (W) is left out. The same list goes out in the Telegram brief.</li>
       <li><b>The 6 pillars:</b> Setup Quality 70+ &middot; Trend Cont. 65+ &middot; Tech Confirm 70+ &middot; Momentum 12-1 in the top 40% &middot; Volume (1.3&times; normal, on buying days) &middot; Entry Timing (inside the Buy Zone, not extended, not stale). It shows what is confirmed; it is not a score. In testing, 5 or 6 green did not do better than 4.</li>
       <li><b>Soft day:</b> when nothing passes, the list shows today's relative leaders instead, and says so.</li>
-      <li><b>Day N on the list</b> &mdash; how many sessions in a row the name has been in Today's Picks (from the Picks Log), with the close when it was first picked and the change since. <i>Back on the list</i> = picked in the last two weeks, dropped off, and returned. In three backtests, buying at the next day's close did slightly better on average than buying straight away; whether the name was still on the list that day made no reliable difference, so use it for timing, not as a filter.</li>
+      <li><b>Day N on the list</b> &mdash; how many sessions in a row the name has been in Today's Picks (from the Picks Log), with the close when it was first picked and the change since. <i>Back on the list</i> = picked in the last two weeks, dropped off, and returned. In your 7-year test, buying at the next day's close did slightly better on average than buying straight away, and names still on the list that day did a little better than ones that had dropped off (+4.6% vs +3.9% over 20 days): a small tilt, not a rule.</li>
       <li><b>Stretched &mdash; wait 1&ndash;2 days:</b> more than 2 ATR above its 20-day average. Strong names this stretched usually paused for a day or two, then kept going.</li>
-      <li><b>Evidence:</b> in your backtest (94 dates, result 21 trading days later), this list beat the average stock in your universe by about 3.3 points, against 2.7 for the old Top Picks. The rule was chosen on that same data, so the <b>Picks Log</b> tab in your first sheet now records every day's picks and their real 5, 10 and 21-day results ("Live record" line above the cards). Judge it after about 3 months.</li>
-      <li><b>Selling (your exit test, 90 test days, top 5 picks):</b> holding with no fixed target did best, and longer was better: about +9% per trade after 40 trading days and +13% after 60, 7.9 points better than the average stock, at a steady ~1.1% a week. Targets of +5% to +20% and trailing stops cut the big winners short and lost most of that edge (+5% was reached by about 70% of picks within 10 days, but left no edge, because the misses fell hard).</li>
-      <li><b>The cost of holding, and the 15% stop:</b> with no stop about half the trades lost (on average 18&ndash;21%) and the worst tenth lost 41&ndash;44%. A 15% stop-loss was the best safety net: the worst tenth lost about 16% instead, and it kept about half the edge (+7.9% per trade at 60 days). A 10% stop sold too many trades that later recovered. Most of the edge came from the newer half of the period, and stocks that collapsed out of your list aren't counted, so treat it as a guide, not a promise.</li>
-      <li><b>Sell by / stop</b> &mdash; each pick shows the date its 60 trading days end, counted from the first session you could buy it (the session after it was first picked), and a stop price 15% below today's price. If you buy on another day or at another price, set the stop 15% below your own buy and count 60 trading days from it. The Telegram brief reminds you when 60 days are up for earlier picks.</li>
-      <li><b>Size</b> &mdash; how much to buy so that hitting the 15% stop costs about 1% of your account: account &times; 1% &divide; 15% &asymp; 6.7% of it per position. Type your account size (US$) and risk % above the cards; they stay in this browser and are never sent anywhere. 15 positions that size fill the account, and with up to 5 new picks a day and a 60-day hold you will run out of money long before you run out of picks: buy the ones you like best, or risk less per trade. A gap down through the stop can lose more than planned. For share counts in Telegram too, add the Script Property <code>ACCOUNT_SIZE</code> (US$) in Apps Script.</li>
-    </ul>
-
-    <h3>Chart patterns (tags, being tested)</h3>
-    <ul>
-      <li>Four classic patterns, found by fixed rules on the daily highs, lows, closes and volume: <b>Fib pullback</b> (gave back 50&ndash;61.8% of a 20%+ rise), <b>Double bottom</b> breakout, <b>Base breakout</b> (out of a tight 5-week range, on volume) and <b>Bull flag</b> breakout. Plus two candlesticks, which need each day's opening price and so show only for stocks whose history comes from Alpaca: <b>Hammer</b> and <b>Bullish engulfing</b>, both after a slide. They show on the pick cards, in the table (Setup Quality column), in the detail panel, and with "Show: chart patterns". Hover or tap a tag for its exact rule.</li>
-      <li>They are tags only: they never change the picks or their order. Violet = not proven yet; green = your backtest found an edge; faded = it found none.</li>
-      <li><b>runPatternBacktest()</b> (Apps Script, about 10&ndash;20 minutes in the background) checks each pattern on your own stored history (7 years once it comes from Alpaca): what those stocks did over the next 10, 21 and 60 days, and over 60 days with the 15% stop, compared with <i>similar</i> stocks on the same days (the same third of your list for momentum and for volatility). A pattern earns "Edge in both halves" only if it beat similar stocks in both the older and the newer half of the period. Results go to a "Pattern Backtest" tab and Telegram, and next to each tag here.</li>
-      <li>Why "similar" stocks: breakouts happen more in strong, jumpy stocks, which do better anyway in a rising market, so against <i>all</i> stocks a pattern can look good just for finding those. Your picks already use momentum; the question is whether a pattern adds anything on top.</li>
+      <li><b>Evidence:</b> in your 7-year exit test (140 test days from December 2020, top 5 picks), holding 20 trading days made about +3.8% per trade, 2.5 points better than the average stock in your universe, and it beat the average stock in both halves of the period (2021&ndash;2023, which includes the 2022 bear market, and 2023&ndash;2026). The rule was partly chosen on that same data, so the <b>Picks Log</b> tab in your first sheet records every day's picks and their real 5, 10 and 21-day results ("Live record" line above the cards). Judge it after about 3 months.</li>
+      <li><b>Selling:</b> holding with no fixed target did best. 60 days made more per trade (+9.6%), but almost all of its edge came from the rising market of 2023&ndash;2026 (only 1.5 points in the older half) and its losers were bigger (worst tenth &minus;43% vs &minus;30%); per week held the two were about equal (+0.8% vs +0.9%). So the plan is <b>20 trading days</b>, the steadier one. Targets of +5% to +20% and trailing stops cut the winners short and did worse. No trading costs are included, and a 20-day hold trades three times as often as 60.</li>
+      <li><b>The 15% stop:</b> without a stop about half the trades lost and the worst tenth lost about 39% (40-day test); with a 15% stop the worst tenth lost about 16%. It's insurance, not a profit booster: over 20 days it cost about a point per trade (+3.8% to +2.7%). A 10% stop sold too many trades that later recovered. Stocks that collapsed out of your list aren't counted, so treat all of this as a guide, not a promise.</li>
+      <li><b>Sell by / stop</b> &mdash; each pick shows the date its 20 trading days end, counted from the first session you could buy it (the session after it was first picked), and a stop price 15% below today's price. If a name has been on the list for longer than 20 days, the date shown is for a buy now (<i>if you buy now</i>). If you buy on another day or at another price, set the stop 15% below your own buy and count 20 trading days from it. The Telegram brief reminds you when the 20 days are up for earlier picks.</li>
+      <li><b>Size</b> &mdash; how much to buy so that hitting the 15% stop costs about 1% of your account: account &times; 1% &divide; 15% &asymp; 6.7% of it per position. Type your account size (US$) and risk % in the boxes above the cards (30000, 30,000 or 30k all work), or pick a common value from the &#9662; list next to each box; they stay in this browser and are never sent anywhere. 15 positions that size fill the account, and with up to 5 new picks a day and a 20-day hold you will run out of money long before you run out of picks: buy the ones you like best, or risk less per trade. A gap down through the stop can lose more than planned. For share counts in Telegram too, add the Script Property <code>ACCOUNT_SIZE</code> (US$) in Apps Script.</li>
     </ul>
 
     <h3>Where the prices come from</h3>
     <ul>
       <li><b>Daily history</b> (7 years of each stock's daily open, high, low, close and volume): from <b>Alpaca</b>'s whole-market data once you run <code>setupAlpacaHistory()</code> in Apps Script, refreshed each morning after the US close. The screen reads the latest 5 years; the backtests use all 7, so their test days reach back to about December 2020 and include the 2022 bear market (with 5 years they could only start around December 2022, in a mostly rising market). Google Finance is the backup for any stock or day Alpaca misses; the HistorySource column in your Data tabs says which, and the status line above the table counts them after each fetch.</li>
       <li>Only finished sessions are stored, and prices are adjusted for splits (not dividends), as on Google Finance. Opening, high and low prices count regular-hours trades only.</li>
+      <li><b>Chart patterns</b> (Fib pullback, double bottom, base and bull flag breakouts, hammer, bullish engulfing) were tested on these 7 years and none did better than similar stocks; picks that showed one did worse. So the app doesn't use them.</li>
       <li><b>Live price</b> during the US day and <b>market cap</b>: Google Finance (about 20 minutes delayed). <b>Pre-market</b>: Alpaca, as before.</li>
       <li><b>Speed:</b> the whole screen is built in the background after each hourly price refresh while the US market is open, and after the morning history update, then saved; "Fetch live data" loads that saved copy in a few seconds. The status line says when it was built, and <i>Recalculate now</i> builds a fresh one on the spot (about a minute). The pre-market board is always current. Charts load from Alpaca in a second or two (Google Finance as the backup).</li>
     </ul>
@@ -650,7 +650,7 @@
 
     <h3>Telegram</h3>
     <ul>
-      <li>The morning brief comes after the daily price refresh (around 7:30&ndash;8am Malaysia time, backup at 9:15): Today's Picks (with sell-by date, stop, size and any chart pattern), your watchlist, the after-hours move and the Live record line. A pre-market update follows at 8:45am New York time (8:45pm Malaysia time; 9:45pm from early November to mid-March).</li>
+      <li>The morning brief comes after the daily price refresh (around 7:30&ndash;8am Malaysia time, backup at 9:15): Today's Picks (with sell-by date, stop and size), your watchlist, the after-hours move and the Live record line. A pre-market update follows at 8:45am New York time (8:45pm Malaysia time; 9:45pm from early November to mid-March).</li>
     </ul>
 
     <p><b>Colors:</b> green = good sign, red = caution, amber = worth noticing, violet = a rough or unconfirmed estimate.</p>
@@ -1329,7 +1329,6 @@ async function fetchAllLive(fresh){
       historicalAnalogues: r.historicalAnalogues || null,
       universeAnalogues: r.universeAnalogues || null,
       radar: r.radar || null,
-      patterns: Array.isArray(r.patterns) ? r.patterns.slice() : [],   // unknown keys are skipped when shown (patternKeys)
       testScore: r.testScore ?? null,
       // r.restartScore is only read as a fallback for older backend deployments
       // that haven't been redeployed with the setupQualityScore field yet —
@@ -2500,55 +2499,6 @@ function renderDailyPicks(rows){
   `;
 }
 
-// --- Chart pattern tags ---------------------------------------------------
-// Found by Code.gs (CHART PATTERNS) at the last completed session. Tags only:
-// they never change a score, a pick or the order. runPatternBacktest() in Apps
-// Script tests them; its verdicts arrive as picksInfo.patternTest.
-const PATTERN_INFO = {
-  fib:  { name: 'Fib 50–61.8% pullback', short: 'Fib pullback',
-          desc: 'After a rise of 20%+ to a high in the last 6 months, the close has given back 50–61.8% of that rise (and never more than 78.6%).' },
-  dbl:  { name: 'Double bottom breakout', short: 'Double bottom',
-          desc: 'Two lows within 4% of each other, 2–16 weeks apart, with a bounce of 8%+ between them; the close broke above that bounce high in the last 10 sessions.' },
-  base: { name: 'Base breakout', short: 'Base breakout',
-          desc: 'A tight 5-week range (under 15% deep) above the 200-day average; the close broke above it in the last 3 sessions on 1.4× its average volume.' },
-  flag: { name: 'Bull flag breakout', short: 'Bull flag',
-          desc: 'A 15%+ rise in 3–15 sessions, then a 3–15 session drift that gave back at most half of it on lighter volume; the last close was the first above the drift.' },
-  hammer: { name: 'Hammer', short: 'Hammer',
-          desc: 'Candlestick: after a slide, at a 2-week low, a day that closed near its high: a lower shadow at least twice the body and half the day\'s range, with a small upper shadow.' },
-  engulf: { name: 'Bullish engulfing', short: 'Engulfing',
-          desc: 'Candlestick: after a slide, a red day followed by a bigger green day (at least half an ATR) whose body covers the red one.' }
-};
-function patternKeys(x){ return (Array.isArray(x) ? x : []).filter(k => PATTERN_INFO[k]); }
-function patternVerdict(k){
-  const t = picksInfo && picksInfo.patternTest;
-  return (t && t.p && t.p[k]) ? t.p[k] : null;
-}
-function patternTestText(k){
-  const t = picksInfo && picksInfo.patternTest, v = patternVerdict(k);
-  if (!v) return 'Not tested yet: run runPatternBacktest() in Apps Script.';
-  const f = x => (x == null || !isFinite(x)) ? '—' : (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x).toFixed(1);
-  return `Your backtest (${t.days} test days, held 60 days with the ${t.stop}% stop): ${f(v.avg)}% per trade, ${f(v.sim)} points vs similar stocks (older half ${f(v.sA)}, newer half ${f(v.sB)}): ${v.text}.`;
-}
-function patternBadgeClass(k){
-  const v = patternVerdict(k);
-  return 'badge pat' + (v && v.v === 'edge' ? ' ok' : (v && (v.v === 'worse' || v.v === 'mixed') ? ' dim' : ''));
-}
-// compact = one badge (+N) for the table; otherwise one badge per pattern.
-function patternBadges(keys, compact){
-  const ks = patternKeys(keys);
-  if (!ks.length) return '';
-  if (compact){
-    const title = ks.map(k => PATTERN_INFO[k].name + ': ' + PATTERN_INFO[k].desc + ' ' + patternTestText(k)).join(' | ');
-    return ` <span class="${patternBadgeClass(ks[0])}" title="${escHtml(title)}">${escHtml(PATTERN_INFO[ks[0]].short)}${ks.length > 1 ? ' +' + (ks.length - 1) : ''}</span>`;
-  }
-  return ks.map(k => `<span class="${patternBadgeClass(k)}" title="${escHtml(PATTERN_INFO[k].name + ': ' + PATTERN_INFO[k].desc + ' ' + patternTestText(k))}">${escHtml(PATTERN_INFO[k].short)}</span>`).join('');
-}
-function patternDetail(r){
-  const ks = patternKeys(r.patterns);
-  if (!ks.length) return '<span class="hint">None at the last close.</span>';
-  return ks.map(k => `<b>${escHtml(PATTERN_INFO[k].name)}</b> &mdash; ${escHtml(PATTERN_INFO[k].desc)}<br><span class="hint">${escHtml(patternTestText(k))}</span>`).join('<br>');
-}
-
 // --- Position size --------------------------------------------------------
 // Buy an amount that loses about RISK % of the account if the stop is hit:
 // account × risk% ÷ stop%. The account size is typed here and kept in this
@@ -2591,25 +2541,76 @@ function sizingNote(){
   const fill = Math.floor(z.stop / z.risk + 1e-9);
   return `= ${(z.frac * 100).toFixed(1)}% of the account per position${z.account > 0 ? ` (${fmtUsd(z.account * z.frac)})` : ''} with the ${z.stop}% stop &middot; ${fill} positions that size fill the account &middot; kept on this device only`;
 }
+// Common values for the ▾ lists next to the two boxes (any other value can be typed).
+const SIZE_ACCOUNTS = [5000, 10000, 15000, 20000, 25000, 30000, 40000, 50000, 75000, 100000, 150000, 200000, 300000, 500000, 1000000];
+const SIZE_RISKS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3];
+// "30000", "30,000", "$30,000", "30k", "1.5%" -> a number; empty -> null; anything else -> NaN.
+function sizingParse(s){
+  let t = String(s == null ? '' : s).trim().toLowerCase().replace(/^us\$?/, '').replace(/[$,\s%]/g, '');
+  if (!t) return null;
+  let mult = 1;
+  if (/[km]$/.test(t)){ mult = t.slice(-1) === 'k' ? 1e3 : 1e6; t = t.slice(0, -1); }
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(t)) return NaN;
+  return parseFloat(t) * mult;
+}
+function fmtAmount(v){ return Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+function fmtRisk(v){ return String(Math.round(Number(v) * 100) / 100); }
+function sizingTitle(z){
+  return `Position size: buy an amount that loses about ${fmtRisk(z.risk)}% of your account if the ${z.stop}% stop is hit (account × ${fmtRisk(z.risk)}% ÷ ${z.stop}%). A gap below the stop can lose more. Type the amounts or pick them from the ▾ lists. Your account size stays in this browser; it is never sent anywhere.`;
+}
 function sizingRow(){
   const z = sizingRule();
   if (!z) return '';
   const s = sizingLoad();
-  return `<div class="pick-sizing" title="Position size: buy an amount that loses about ${z.risk}% of your account if the ${z.stop}% stop is hit (account × ${z.risk}% ÷ ${z.stop}%). A gap below the stop can lose more. Your account size stays in this browser; it is never sent anywhere.">
+  const opts = (list, label, cur) => '<option value="">Pick…</option>' +
+    list.map(v => `<option value="${v}"${cur === v ? ' selected' : ''}>${label(v)}</option>`).join('');
+  const box = (id, mode, value, ph) => `<input id="${id}" type="text" inputmode="${mode}" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="${ph}" value="${value}" oninput="sizingChanged()" onchange="sizingTidy()" onkeydown="if(event.key==='Enter')this.blur()">`;
+  return `<div class="pick-sizing" title="${escHtml(sizingTitle(z))}">
       <span class="k">Position size</span>
-      <label>Account US$ <input id="szAccount" type="number" inputmode="decimal" min="0" step="any" placeholder="optional" value="${s.account != null ? s.account : ''}" oninput="sizingChanged()"></label>
-      <label>Risk <input id="szRisk" type="number" inputmode="decimal" min="0.1" max="10" step="0.1" value="${z.risk}" oninput="sizingChanged()">% per trade</label>
+      <span class="sz-field"><label for="szAccount">Account US$</label><span class="sz-combo">${box('szAccount', 'numeric', s.account > 0 ? fmtAmount(s.account) : '', 'optional')}<span class="sz-pick"><span aria-hidden="true">&#9662;</span><select id="szAccountPick" aria-label="Pick an account size (US$)" onchange="sizingPick('szAccount', this)">${opts(SIZE_ACCOUNTS, v => '$' + fmtAmount(v), s.account)}</select></span></span></span>
+      <span class="sz-field"><label for="szRisk">Risk</label><span class="sz-combo">${box('szRisk', 'decimal', fmtRisk(z.risk), '1')}<span class="sz-pick"><span aria-hidden="true">&#9662;</span><select id="szRiskPick" aria-label="Pick the risk per trade (%)" onchange="sizingPick('szRisk', this)">${opts(SIZE_RISKS, v => v + '%', z.risk)}</select></span></span><span>% per trade</span></span>
       <span id="szNote" class="hint">${sizingNote()}</span>
     </div>`;
 }
 // Typing updates the size lines in place (no re-render, so the box keeps focus).
+// Something that isn't an amount turns the box red and keeps the last good value.
 function sizingChanged(){
-  const a = num((document.getElementById('szAccount') || {}).value);
-  const r = num((document.getElementById('szRisk') || {}).value);
-  sizingSave({ account: a > 0 ? a : null, risk: (r > 0 && r <= 10) ? r : null });
+  const ai = document.getElementById('szAccount'), ri = document.getElementById('szRisk');
+  const prev = sizingLoad();
+  const a = ai ? sizingParse(ai.value) : prev.account;
+  const r = ri ? sizingParse(ri.value) : prev.risk;
+  const aOk = a === null || a > 0, rOk = r === null || (r > 0 && r <= 10);
+  if (ai) ai.classList.toggle('bad', !aOk);
+  if (ri) ri.classList.toggle('bad', !rOk);
+  sizingSave({ account: aOk ? a : prev.account, risk: rOk ? r : prev.risk });
+  sizingRefresh();
+}
+function sizingRefresh(){
   document.querySelectorAll('#dailyPicksPanel .pick-size').forEach(el => { el.innerHTML = sizeText(el.dataset.px); });
   const n = document.getElementById('szNote');
   if (n) n.innerHTML = sizingNote();
+  const s = sizingLoad(), z = sizingRule();
+  const row = document.querySelector('#dailyPicksPanel .pick-sizing');
+  if (row && z) row.title = sizingTitle(z);
+  // the lists open at the current value when it is one of theirs
+  const ap = document.getElementById('szAccountPick'), rp = document.getElementById('szRiskPick');
+  if (ap) ap.value = SIZE_ACCOUNTS.indexOf(s.account) >= 0 ? String(s.account) : '';
+  if (rp && z) rp.value = SIZE_RISKS.indexOf(z.risk) >= 0 ? String(z.risk) : '';
+}
+// Leaving a box (or pressing Enter/Done) tidies it: 30000 -> 30,000; a bad entry goes back to the last good one.
+function sizingTidy(){
+  const s = sizingLoad(), z = sizingRule();
+  const ai = document.getElementById('szAccount'), ri = document.getElementById('szRisk');
+  if (ai){ ai.value = s.account > 0 ? fmtAmount(s.account) : ''; ai.classList.remove('bad'); }
+  if (ri && z){ ri.value = fmtRisk(z.risk); ri.classList.remove('bad'); }
+}
+// A value picked from a ▾ list.
+function sizingPick(id, sel){
+  const el = document.getElementById(id), v = Number(sel.value);
+  if (!el || !sel.value || !(v > 0)) return;
+  el.value = id === 'szAccount' ? fmtAmount(v) : fmtRisk(v);
+  sizingChanged();
+  sizingTidy();
 }
 
 // "Thu 1 Oct" for a yyyy-mm-dd date.
@@ -2649,14 +2650,14 @@ function renderMergedPicks(panel, rows){
     + ' Names with a fresh trim warning (W) are left out. Same list as the Telegram brief.'
     + (soft ? ' Soft day: nothing qualified, so these are today\u2019s top percentile-rank names instead.' : '')
     + (timedRule
-      ? ' In your backtest this rule beat the old Top Picks in both halves of the period (about +3.3 vs +2.7 points over 21 days, against the average stock), but it was chosen on that same data. The Picks Log tab in your first sheet keeps the live record.'
+      ? ' In your 7-year exit test (top 5 picks, held 20 trading days) this rule beat the average stock by about 2.5 points per trade, in both halves of the period, but it was partly chosen on that same data. The Picks Log tab in your first sheet keeps the live record.'
       : ' The Picks Log tab in your first sheet keeps the live record of every day\u2019s picks.')
-    + ` Selling: in your exit test, holding with no fixed target did best (60 days beat 40), and a ${picksInfo.stopPct || 15}% stop-loss kept about half of that with much smaller worst cases, so each card shows a sell-by date and a stop price (details in How to read this).`;
+    + ` Selling: in that test, holding with no fixed target did best. ${picksInfo.holdDays || 20} trading days was the steadier hold (60 made more per trade, but almost all of it in 2023\u201326), and a ${picksInfo.stopPct || 15}% stop-loss limits the worst cases for about a point per trade, so each card shows a sell-by date and a stop price (details in How to read this).`;
   const due = picksInfo.track && picksInfo.track.sellDue;
   const track = ((picksInfo.track && picksInfo.track.text)
     ? `<div class="picks-track" title="From the Picks Log tab in your first sheet: each morning's picks and how they did 5, 10 and 21 US sessions later, vs SPY and vs the average stock in your universe.">Live record: ${escHtml(picksInfo.track.text)}</div>`
     : '') + ((due && Array.isArray(due.syms) && due.syms.length)
-    ? `<div class="picks-due">${picksInfo.holdDays || 60} trading days are up for picks first chosen ${escHtml(dayLabel(due.first))}: <b>${due.syms.map(x => escHtml(safeSym(x))).join(', ')}</b>. If you still hold them, the tested plan sells in the next session (${escHtml(dayLabel(due.sellBy))}).</div>`
+    ? `<div class="picks-due">${picksInfo.holdDays || 20} trading days are up for picks first chosen ${escHtml(dayLabel(due.first))}: <b>${due.syms.map(x => escHtml(safeSym(x))).join(', ')}</b>. If you still hold them, the tested plan sells in the next session (${escHtml(dayLabel(due.sellBy))}).</div>`
     : '');
   panel.style.display = 'block';
   const head = `
@@ -2673,20 +2674,19 @@ function renderMergedPicks(panel, rows){
   panel.innerHTML = head + track + sizingRow() + `<div class="picks-grid">${P.map(p => {
     const sym = safeSym(p.sym);
     const x = bySym[sym], r = x ? x.r : { sym: sym };
-    const pats = patternKeys(Array.isArray(p.patterns) ? p.patterns : r.patterns);
     const badge = (soft && p.pctRank != null) ? 'pct. ' + p.pctRank : `${p.gl.count}/${p.gl.total}`;
     let timing = '';
     if (p.timing) timing = `<div class="pick-timing">${escHtml(p.timing)}${p.fragile ? ' <span class="hint" title="The opposite signal is within 0.5% — MACD is almost flat and can flip back">(fragile)</span>' : ''}</div>`;
     else if (p.next === 'B' && p.trig != null) timing = `<div class="pick-timing dim">No B yet &middot; B if it closes &ge; ${fmt(p.trig,2)}${p.trigPct != null ? ` (${p.trigPct > 0 ? '+' : '&minus;'}${Math.abs(p.trigPct).toFixed(1)}%)` : ''}</div>`;
     else if (p.next === 'S' && p.trig != null) timing = `<div class="pick-timing dim">MACD up &middot; S on a close &le; ${fmt(p.trig,2)}</div>`;
-    const tags = [p.checklist ? '<span class="badge mom-up">checklist</span>' : '', p.tier ? '<span class="badge sig-b">MACD timing</span>' : '',
-      patternBadges(pats)].filter(Boolean).join('');
+    const tags = [p.checklist ? '<span class="badge mom-up">checklist</span>' : '', p.tier ? '<span class="badge sig-b">MACD timing</span>' : ''].filter(Boolean).join('');
     const size = num(p.price) > 0 ? sizeText(p.price) : '';
+    const hold = picksInfo.holdDays || 20, stopP = picksInfo.stopPct || 15;
     return `
       <div class="pick-card" onclick="openDetail('${sym}')">
         <div class="pick-top"><span class="pick-sym">${sym}</span><span class="badge mom-up">${badge}</span></div>
         ${onListLine(p)}
-        ${p.sellBy ? `<div class="pick-sell" title="Sell by: ${picksInfo.holdDays || 60} US trading days after the first session it could be bought (the session after it was first picked). Stop: ${picksInfo.stopPct || 15}% below today's price; if you buy at another price, set it ${picksInfo.stopPct || 15}% below your own buy. In your exit test, holding with no fixed target did best (60 days beat 40), and a ${picksInfo.stopPct || 15}% stop-loss kept about half of that with much smaller worst cases.">Sell by <b>${escHtml(dayLabel(p.sellBy))}</b>${p.stop ? ` &middot; stop <b>${fmt(num(p.stop),2)}</b> <span class="hint">(&minus;${picksInfo.stopPct || 15}%)</span>` : ` <span class="hint">&middot; ${picksInfo.holdDays || 60}-day hold</span>`}</div>` : ''}
+        ${p.sellBy ? `<div class="pick-sell" title="Sell by: ${hold} US trading days after the first session it could be bought (the session after it was first picked)${p.sellByNew ? `. It has been on the list for longer than that, so this date is for a buy now` : ''}. Stop: ${stopP}% below today's price; if you buy at another price, set it ${stopP}% below your own buy. In your 7-year exit test, holding with no fixed target did best; 20 days was steadier than 60, and a 15% stop limited the worst cases for about a point per trade.">Sell by <b>${escHtml(dayLabel(p.sellBy))}</b>${p.sellByNew ? ' <span class="hint">if you buy now</span>' : ''}${p.stop ? ` &middot; stop <b>${fmt(num(p.stop),2)}</b> <span class="hint">(&minus;${stopP}%)</span>` : ` <span class="hint">&middot; ${hold}-day hold</span>`}</div>` : ''}
         ${size ? `<div class="pick-size" data-px="${num(p.price)}" title="Position size: an amount that loses about your risk % of the account if the stop is hit (account × risk% ÷ stop%), at today's price. Set your account size above the cards; it stays on this device.">${size}</div>` : ''}
         ${tags ? `<div class="pick-tags">${tags}</div>` : ''}
         ${timing}
@@ -2736,7 +2736,6 @@ function render(){
   if (filterMode==='setup') rows = rows.filter(x=>x.c.isSetup);
   if (filterMode==='trendcont') rows = rows.filter(x=>x.c.isTrendContinuation);
   if (filterMode==='signals') rows = rows.filter(x=>x.r.radar && (x.r.radar.sig || x.r.radar.w != null || (x.r.radar.next==='B' && x.r.radar.near)));
-  if (filterMode==='patterns') rows = rows.filter(x=>patternKeys(x.r.patterns).length);
   if (filterMode==='top20'){
     rows = rows.filter(x=>x.c.setupQualityScore!==null);
     // Default cut: setup-quality score first, high liquidity as the
@@ -2754,7 +2753,6 @@ function render(){
   } else {
     if (sortState.key) applyColumnSort(rows);
     else if (filterMode==='signals') rows.sort((a,b)=> ((b.r.radar.setup?1:0)-(a.r.radar.setup?1:0)) || ((num(b.r.momPercentile)??-1)-(num(a.r.momPercentile)??-1)));
-    else if (filterMode==='patterns') rows.sort((a,b)=> (patternKeys(b.r.patterns).length - patternKeys(a.r.patterns).length) || ((num(b.r.momPercentile)??-1)-(num(a.r.momPercentile)??-1)));
     else rows.sort((a,b)=> a.r.sym.localeCompare(b.r.sym));
     if (limitN !== null) rows = rows.slice(0, limitN);
   }
@@ -2793,7 +2791,7 @@ function renderRows(rows){
       <td>${rsiCell(r)}</td>
       <td class="score ${scoreClass(r.technicalConfirmationScore)}">${r.technicalConfirmationScore!=null?Math.round(r.technicalConfirmationScore):'&mdash;'}</td>
       <td title="${r.radar ? escHtml(radarTrigText(r.radar)) : (r.macdCrossUp?'Fresh bullish cross. ':'') + (r.macdDirection||'')}">${r.macdHistogram!=null?fmt(r.macdHistogram,2):'&mdash;'} ${radarBadge(r)}</td>
-      <td class="score ${scoreClass(c.setupQualityScore)}">${c.setupQualityScore===null?'&mdash;':Math.round(c.setupQualityScore)} ${c.isSetup?'<span class="badge mom-up">setup</span>':''}${patternBadges(r.patterns, true)}</td>
+      <td class="score ${scoreClass(c.setupQualityScore)}">${c.setupQualityScore===null?'&mdash;':Math.round(c.setupQualityScore)} ${c.isSetup?'<span class="badge mom-up">setup</span>':''}</td>
       <td class="score ${scoreClass(c.trendContinuationScore)}" title="${c.trendExtended?'Strong trend, but price is already extended above the buy zone / upper Bollinger band — a worse immediate entry even though the trend itself looks fine.':''}">${c.trendContinuationScore===null?'&mdash;':Math.round(c.trendContinuationScore)} ${c.isTrendContinuation?'<span class="badge mom-up">trend</span>':''}${c.trendExtended?'<span class="badge" style="color:var(--amber);border:1px solid var(--amber-dim);">extended</span>':''}</td>
       <td>${c.currentDrawdownPct===null?'&mdash;':fmt(c.currentDrawdownPct,1)+'%'} ${bandBadge(c.band)}</td>
       <td><select class="cell" ${r.fromSheet?'disabled':''} onclick="event.stopPropagation()" onchange="upd('${r.sym}','trend',this.value)">
@@ -2915,7 +2913,6 @@ function openDetail(sym, silent){
       <div><div class="k">ADX / DI</div><div class="v">${r.adx14!=null?fmt(r.adx14,1):'&mdash;'} ${r.adxDirection||''} · +${r.plusDI14!=null?fmt(r.plusDI14,1):'&mdash;'} / −${r.minusDI14!=null?fmt(r.minusDI14,1):'&mdash;'}</div></div>
       <div><div class="k">MACD</div><div class="v">${r.macdHistogram!=null?fmt(r.macdHistogram,2):'&mdash;'} ${radarBadge(r)}</div></div>
       ${r.radar && r.radar.trig != null ? `<div><div class="k">Next MACD signal (trigger)</div><div class="v" style="font-size:13px;">${escHtml(radarTrigText(r.radar))}${r.radar.live === 'on' ? ' <span class="hint">(live price already there)</span>' : ''}</div></div>` : ''}
-      <div style="grid-column:1/-1;"><div class="k">Chart patterns <span class="hint" style="text-transform:none;letter-spacing:0;">(tags only, being tested)</span></div><div class="v pat-list">${patternDetail(r)}</div></div>
       <div><div class="k">ROC 20D</div><div class="v">${r.roc20!=null?fmt(r.roc20,1)+'%':'&mdash;'}</div></div>
       <div><div class="k">Relative Volume</div><div class="v">${r.relativeVolume20!=null?fmt(r.relativeVolume20,2)+'×':'&mdash;'}</div></div>
       <div><div class="k">Bollinger Position / Width</div><div class="v">${r.bollingerPosition!=null?fmt(r.bollingerPosition*100,0)+'% / '+fmt(r.bollingerWidth,1)+'%':'&mdash;'}</div></div>
